@@ -19,8 +19,8 @@ typedef struct {
     double dst; // km
     double dh; // m
     double kms; // kms
-    double t; // minutes
-    double pause; // minutes
+    uint64_t t; // minutes
+    uint64_t pause; // minutes
 } PathSegmentData;
 
 #define MAX_SOURCE_LEN 64 * 1000 * 1000
@@ -254,15 +254,16 @@ void calculate_path_segments_data() {
         ps->kms += kms;
 
         if (distance(&waypoints[wp_idx], &path[i]) <= 0.0001) { // TODO: calculate min ddistance
-            ps->t =  60.0 * (ps->kms / FACTOR);
-            ps->pause = round5((ps->t * PAUSE_FACTOR));
+            double time = 60.0 * (ps->kms / FACTOR);
+            ps->t = (uint64_t) round(time);
+            ps->pause = (uint64_t) round5(time * PAUSE_FACTOR);
             wp_idx++;
             segments_len++;
 
             {
-                size_t min = (size_t) fmod(ps->t, 60.0);
-                size_t hours = (size_t) (ps->t / 60.0);
-                printf("%f km; %f m; %f kms; %f min (%02ldh %02ldm) - %f\n", ps->dst, ps->dh, ps->kms, ps->t, hours, min, ps->pause);
+                size_t min = ps->t % 60;
+                size_t hours = ps->t / 60;
+                printf("%f km; %f m; %f kms; %ld min (%02ldh %02ldm) - %ld\n", ps->dst, ps->dh, ps->kms, ps->t, hours, min, ps->pause);
             }
         }
     }
