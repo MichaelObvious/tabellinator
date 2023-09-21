@@ -1,3 +1,7 @@
 # Tabellinator
 
-GPX -> Tabella di marcia
+`GPX -> Tabella di marcia`
+
+## Requisiti
+
+- `xelatex`
