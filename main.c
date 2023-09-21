@@ -6,8 +6,8 @@
 #include "xml.c"
 
 #define FILE_PATH "path.gpx"
-#define FACTOR 4 //kms/h
-#define PAUSE_FACTOR (15.0 /* min/h */ /60.0) // -> min/min
+#define FACTOR 4 // kms/h
+#define PAUSE_FACTOR 15.0/60.0 // min/min
 
 typedef struct {
     double lat;
@@ -41,6 +41,11 @@ size_t path_len = 0;
 #define PATH_SEGMENTS_CAP WAYPOINTS_CAPACITY
 PathSegmentData segments[PATH_SEGMENTS_CAP] = {0};
 size_t segments_len = 0;
+
+// round to nearest 5 multiple
+inline static double round5(double x) {
+    return round(x / 5.0) * 5.0;
+}
 
 inline static double deg2rad(double a) {
     return (a / 180.0) * M_PI;
@@ -250,15 +255,15 @@ void calculate_path_segments_data() {
 
         if (distance(&waypoints[wp_idx], &path[i]) <= 0.0001) { // TODO: calculate min ddistance
             ps->t =  60.0 * (ps->kms / FACTOR);
-            ps->pause = ps->t / PAUSE_FACTOR;
+            ps->pause = round5((ps->t * PAUSE_FACTOR));
             wp_idx++;
             segments_len++;
 
-            // {
-            //     size_t min = (size_t) fmod(ps->t, 60.0);
-            //     size_t hours = (size_t) (ps->t / 60.0);
-            //     printf("%f km; %f m; %f kms; %f min (%02ldh %02ldm)\n", ps->dst, ps->dh, ps->kms, ps->t, hours, min);
-            // }
+            {
+                size_t min = (size_t) fmod(ps->t, 60.0);
+                size_t hours = (size_t) (ps->t / 60.0);
+                printf("%f km; %f m; %f kms; %f min (%02ldh %02ldm) - %f\n", ps->dst, ps->dh, ps->kms, ps->t, hours, min, ps->pause);
+            }
         }
     }
 }
