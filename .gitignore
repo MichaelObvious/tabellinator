@@ -1,2 +1,11 @@
 *.out
 *.gpx
+*.xml
+*.json
+*.pdf
+*.tex
+*.fls
+*.synctex.gz
+*.log
+*.aux
+*.fdb_latexmk

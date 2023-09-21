@@ -2,11 +2,13 @@
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <locale.h>
 
 #include "xml.c"
 
 #define FILE_PATH "path.gpx"
-#define FACTOR 4 // kms/h
+#define OUTPUT_FILE_PATH "output.tex"
+#define FACTOR 4.0 // kms/h
 #define PAUSE_FACTOR 15.0/60.0 // min/min
 
 typedef struct {
@@ -71,6 +73,43 @@ double distance(const Point* a, const Point* b) {
     const double A = (K1 * deltaPhi);
     const double B = (K2 * deltaLambda);
     return sqrt(A * A + B * B);
+}
+
+void wsg84_to_lv95(double phi, double lambda, double* E, double* N) {
+    #define G2S(x) x * 3600.0
+    double phi_ = (G2S(phi) - 169028.66)/10000.0;
+    double lambda_ = (G2S(lambda) - 26782.5)/10000.0;
+
+    *E = 2600072.37
+        + 211455.93 * lambda_
+        - 10938.51 * lambda_ * phi_
+        - 0.36 * lambda_ * phi_ * phi_
+        - 44.54 * lambda_ * lambda_ * lambda_;
+    
+    *N = 1200147.07
+        + 308807.95 * phi_
+        + 3745.25 * lambda_ * lambda_
+        + 76.63 * phi_ * phi_
+        - 194.56 * lambda_ * lambda_ * phi_
+        + 119.79 * phi_ * phi_ * phi_;
+}
+
+void wsg84_to_lv95i(double phi, double lambda, uint64_t* E, uint64_t* N) {
+    double e, n;
+    wsg84_to_lv95(phi, lambda, &e, &n);
+    *E = (uint64_t) round(e);
+    *N = (uint64_t) round(n);
+}
+
+void code_name(size_t idx, char code[2]) {
+    char letter = ((idx%26) + 'A');
+    char number = (idx / 26) + '0';
+    if (number == '0') {
+        number = ' ';
+    }
+    assert(number <= '9' && "Too many waypoints");
+    code[0] = letter;
+    code[1] = number;
 }
 
 int load_source(const char* path) {
@@ -256,17 +295,104 @@ void calculate_path_segments_data() {
         if (distance(&waypoints[wp_idx], &path[i]) <= 0.0001) { // TODO: calculate min ddistance
             double time = 60.0 * (ps->kms / FACTOR);
             ps->t = (uint64_t) round(time);
-            ps->pause = (uint64_t) round5(time * PAUSE_FACTOR);
-            wp_idx++;
-            segments_len++;
-
+            (ps+1)->pause = (uint64_t) round5(time * PAUSE_FACTOR);
             {
                 size_t min = ps->t % 60;
                 size_t hours = ps->t / 60;
+
+                uint64_t E, N;
+                wsg84_to_lv95i(waypoints[wp_idx].lat, waypoints[wp_idx].lon, &E, &N);
+                printf("Waypoint: %ld %ld\n", E, N);
+
+
                 printf("%f km; %f m; %f kms; %ld min (%02ldh %02ldm) - %ld\n", ps->dst, ps->dh, ps->kms, ps->t, hours, min, ps->pause);
             }
+            wp_idx++;
+            segments_len++;
         }
     }
+}
+
+void print_latex_document(FILE* sink) {
+    #define DOC_MARGIN 1.0
+    setlocale(LC_NUMERIC, "");
+
+    fprintf(sink, "\\documentclass[a4paper,10pt,landscape]{article}\n");
+    fprintf(sink, "\\usepackage{multirow}\n");
+    fprintf(sink, "\\usepackage[margin=%.0fcm]{geometry}\n", DOC_MARGIN);
+    fprintf(sink, "\\usepackage{microtype}\n");
+    fprintf(sink, "\\usepackage{longtable}\\");
+    fprintf(sink, "\n");
+    fprintf(sink, "\\begin{document}\n");
+    fprintf(sink, "    \\begin{center}\n");
+    fprintf(sink, "        \\textbf{\\Huge %s}\n", name);
+    fprintf(sink, "    \\end{center}\n");
+    fprintf(sink, "\n");
+    fprintf(sink, "\\vspace{2ex}\n");
+    fprintf(sink, "\n");
+    fprintf(sink, "    \\begin{center}\\begin{tabular}{|c|c||c|c|}\n");
+    fprintf(sink, "        \\hline\n");
+    fprintf(sink, "        \\multirow{2}{*}{Fattore di pausa:} & \\multirow{2}{*}{$%0.2f \\hphantom{a} \\frac{min}{h} $} & \\multirow{2}{*}{Fattore di marcia:} & \\multirow{2}{*}{$%0.1f \\hphantom{a} \\frac{kms}{h}$}\\\\\n", PAUSE_FACTOR * 60.0, FACTOR);
+    fprintf(sink, "        &&&\\\\\n");
+    fprintf(sink, "        \\hline\n");
+    fprintf(sink, "    \\end{tabular}\\end{center}\n");
+    fprintf(sink, "\n");
+    fprintf(sink, "    \\begin{longtable}{|c|c|c|c|c|c|c|c|c|c|c|c|c|l|}\n");
+    fprintf(sink, "        \\hline\n");
+    fprintf(sink, "        \\multirow{2}{*}{Nome} & \\multirow{2}{*}{Coord. (LV95)} & \\multirow{2}{*}{Alt. [m]} & \\multirow{2}{*}{$\\Delta h$ [hm]} & \\multirow{2}{*}{$\\Delta s$ [km]} & \\multirow{2}{*}{$\\Delta kms$} & \\multirow{2}{*}{$\\Delta t$ [hh:mm]} & \\multirow{2}{*}{$s$ [km]} & \\multirow{2}{*}{$kms$} & \\multirow{2}{*}{$t$ [hh:mm]} & \\multirow{2}{*}{$t$ [hh:mm]} & \\multirow{2}{*}{Pausa [hh:mm]} & \\multirow{2}{*}{Osservazioni \\hphantom{aaaaaaaaaa}} \\\\\n");
+    fprintf(sink, "        &&&&&&&&&&&&\\\\\n");
+    fprintf(sink, "        \\hline\n");
+    fprintf(sink, "        \\hline\n");
+
+    char wp_name[2] = "  ";
+    uint64_t E, N;
+    double km, kms = 0;
+    uint64_t t = 0;
+    // assert(waypoints_len == segments_len + 1);
+    for (size_t i = 0; i < waypoints_len; i++) {
+        Point wp = waypoints[i];
+        PathSegmentData psd = segments[i];
+        code_name(i, wp_name);
+        wsg84_to_lv95i(wp.lat, wp.lon, &E, &N);
+        fprintf(sink, "\\multirow{2}{*}{%.*s} & ", 2, wp_name);
+        fprintf(sink, "\\multirow{2}{*}{%'ld %'ld} & ", E, N); 
+        fprintf(sink, "\\multirow{2}{*}{%'.0f} & ", round(wp.ele));
+        fprintf(sink, " & & & & ");
+        fprintf(sink, "\\multirow{2}{*}{%.1f} &", km);
+        fprintf(sink, "\\multirow{2}{*}{%.1f} &", kms);
+        fprintf(sink, "\\multirow{2}{*}{%02ld:%02ld} &", t / 60, t % 60);
+        fprintf(sink, "\\multirow{2}{*}{} &");
+        if (i < waypoints_len-1 && i > 0 && psd.pause > 0) {
+            fprintf(sink, "\\multirow{2}{*}{%02ld:%02ld} &", psd.pause / 60, psd.pause % 60);
+        } else {
+            fprintf(sink, "\\multirow{2}{*}{} &");
+        }
+        fprintf(sink, "\\multirow{2}{*}{}\\\\\n");
+        fprintf(sink, "        \\cline{4-7} \n");
+        if (i < waypoints_len-1) {
+            fprintf(sink, " & & & ");
+            fprintf(sink, "\\multirow{2}{*}{%.1f} & ", psd.dh/100.0);
+            fprintf(sink, " \\multirow{2}{*}{%.1f} &", psd.dst);
+            fprintf(sink, " \\multirow{2}{*}{%.1f} &", psd.kms);
+            fprintf(sink, "\\multirow{2}{*}{%02ld:%02ld}&&&&&& \\\\\n", psd.t / 60, psd.t % 60);
+
+            km += psd.dst;
+            kms += psd.kms;
+            t += psd.t + psd.pause;
+            
+            // fprintf(sink, "&&&&&&&&& \\\\\n");
+            fprintf(sink, "        \\cline{1-3}\\cline{8-13} \n");
+        } else {
+            fprintf(sink, "&&&&&&&&&&&&\\\\\n");
+            fprintf(sink, "\\hline\n");
+        }
+    }
+
+    fprintf(sink, "    \\end{longtable}\n");
+    fprintf(sink, "\n");
+    fprintf(sink, "\n");
+    fprintf(sink, "\n");
+    fprintf(sink, "\\end{document}\n");
 }
 
 int main(void) {
@@ -321,7 +447,17 @@ int main(void) {
     // Output table
     // Output graph
     // Output latex doc
+    FILE *out_file = fopen(OUTPUT_FILE_PATH, "w");
+    if (out_file == NULL) {
+        out_file = stdout;
+    }
+    print_latex_document(out_file);
+
     // Create PDF
+    if (out_file != stdout) {
+        fclose(out_file);
+        system("xelatex -interaction=nonstopmode output.tex");
+    }
 
     return 0;
 }
