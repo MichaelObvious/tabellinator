@@ -7,6 +7,7 @@
 
 #define FILE_PATH "path.gpx"
 #define FACTOR 4 //kms/h
+#define PAUSE_FACTOR (15.0 /* min/h */ /60.0) // -> min/min
 
 typedef struct {
     double lat;
@@ -19,6 +20,7 @@ typedef struct {
     double dh; // m
     double kms; // kms
     double t; // minutes
+    double pause; // minutes
 } PathSegmentData;
 
 #define MAX_SOURCE_LEN 64 * 1000 * 1000
@@ -248,6 +250,7 @@ void calculate_path_segments_data() {
 
         if (distance(&waypoints[wp_idx], &path[i]) <= 0.0001) { // TODO: calculate min ddistance
             ps->t =  60.0 * (ps->kms / FACTOR);
+            ps->pause = ps->t / PAUSE_FACTOR;
             wp_idx++;
             segments_len++;
 
@@ -306,6 +309,7 @@ int main(void) {
     // Calculate distance and difference in altitude between Waypoints
     // Calculate kms
     // Calculate time
+    // Set pauses
     calculate_path_segments_data();
     
     // Output table
