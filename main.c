@@ -579,21 +579,38 @@ void print_latex_document(FILE* sink) {
 
         for (size_t i = 0; i < 4; i++) {
             if (map_ids[i] == 0) continue;
+            char tiff_file[16] = {0};
+            char jpg_file[16] = {0};
+            char map_file[24] = {0};
+            snprintf(tiff_file, 15, "%ld.tif", map_ids[i]);
+            snprintf(jpg_file, 15, "%ld-0.jpg", map_ids[i]);
+            snprintf(map_file, 24, "map-%ld-%05ld.jpg", map_ids[i], time()%100000);
 
-            char get_url_cmd[256] = {0};
-            char img_file[16] = {0};
             uint64_t year = get_year(map_ids[0]);
 
-            snprintf(img_file, 15, "%ld.tif", map_ids[i]);
-            if (!file_exists(img_file)) {
-                snprintf(get_url_cmd, 255, "curl https://data.geo.admin.ch/ch.swisstopo.pixelkarte-farbe-pk25.noscale/swiss-map-raster25_%ld_%ld/swiss-map-raster25_%ld_%ld_krel_1.25_2056.tif > %s", year, map_ids[0], year, map_ids[0], img_file);
+            if (!file_exists(tiff_file)) {
+                char get_url_cmd[256] = {0};
+                snprintf(get_url_cmd, 255, "curl https://data.geo.admin.ch/ch.swisstopo.pixelkarte-farbe-pk25.noscale/swiss-map-raster25_%ld_%ld/swiss-map-raster25_%ld_%ld_krel_1.25_2056.tif > %s"
+#ifdef _WIN32
+                    " > nul"
+#else
+                    " 2> /dev/null"
+#endif
+                , year, map_ids[0], year, map_ids[0], tiff_file);
                 system(get_url_cmd);
+            }
 
-                // TODO: load stbi image
-                // TODO: crop image with stbi
-                // TODO: scale image with stbi
-                // TODO: save image as stb
+            if (!file_exists(jpg_file)) {
 
+                char convert_cmd[256] = {0};
+                snprintf(convert_cmd, 255, "magick %s %.*s.jpg"
+#ifdef _WIN32
+                    " > nul"
+#else
+                    " 2> /dev/null"
+#endif
+                , tiff_file, strlen(tiff_file)-4,tiff_file);
+                system(convert_cmd);
             }
 
             // fprintf(sink, "\\node[inner sep=0pt] (russell) at (0,0){\\includegraphics[width=\\textwidth]{%s}};\n", img_file);

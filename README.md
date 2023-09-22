@@ -6,3 +6,4 @@
 
 - `xelatex`
 - `curl`
+- `ìmagemagick`
