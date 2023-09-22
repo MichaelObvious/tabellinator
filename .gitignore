@@ -9,3 +9,6 @@
 *.log
 *.aux
 *.fdb_latexmk
+*.old
+tabellinator
+nobuild

@@ -500,20 +500,21 @@ void print_latex_document(FILE* sink) {
     fprintf(sink, "\\end{document}\n");
 }
 
-void print_usage() {
-    printf("USAGE: ./tabellinator <path/to/file.gpx>");
+void print_usage(char* program) {
+    printf("USAGE: %s <path/to/file.gpx>\n", program);
 }
 
 int main(int argc, char* argv[]) {
     if (argc < 2) {
-        print_usage();
+        fprintf(stderr, "[ERROR] Pathath to GPX file not provided.\n");
+        print_usage(argv[0]);
         return 0;
     }
 
     char* file_path = argv[1];
 
     if (strcmp(file_path+strlen(file_path)-4, ".gpx") != 0) {
-        fprintf(stderr, "[ERROR] Provided file was not GPX.");
+        fprintf(stderr, "[ERROR] Provided file was not GPX.\n");
         return 1;
     }
     snprintf(out_file_path, 128, "%.*s.tex", (int) strlen(file_path)-4, file_path);
@@ -533,7 +534,7 @@ int main(int argc, char* argv[]) {
         if (pause_factor > 0) PAUSE_FACTOR = pause_factor/60.0;
 
         printf(" - Tempo d'inizio [hh:mm]: ");
-        scanf("%ld:%ld", &hours, &mins);
+        scanf("%zu:%zu", &hours, &mins);
         if (hours >= 0 && mins >= 0) START_TIME = hours * 60 + mins;
 
         // printf("%f %f %ld:%ld\n\n\n", factor, pause_factor, hours, mins);
@@ -557,11 +558,11 @@ int main(int argc, char* argv[]) {
 
     // Retrieve tour name
     extract_tour_name(root);
-    printf("Tour name:         '%s'\n", name);
+    // printf("Tour name:         '%s'\n", name);
 
     // Retrieve Waypoints
     extract_waypoints(root);
-    printf("Waypoint count:     %ld\n", waypoints_len);
+    // printf("Waypoint count:     %ld\n", waypoints_len);
 
     // Retrieve path
     struct xml_node* track_container = xml_node_child(root, children-1);
@@ -579,7 +580,7 @@ int main(int argc, char* argv[]) {
 
             free(name_str);
     }
-    printf("Path element count: %ld\n", path_len);
+    // printf("Path element count: %ld\n", path_len);
 
     // Calculate distance and difference in altitude between Waypoints
     // Calculate kms
@@ -604,8 +605,7 @@ int main(int argc, char* argv[]) {
         snprintf(command, 256, "xelatex -interaction=nonstopmode '%s'"
 #ifdef _WIN32
         " > nul"
-#endif
-#ifdef __unix__
+#else
         " > /dev/null"
 #endif
         , out_file_path);
