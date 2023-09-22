@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <locale.h>
+#include <time.h>
 
 #include "xml.c"
 
@@ -11,6 +12,8 @@
 double FACTOR = 5.0; // kms/h
 double PAUSE_FACTOR = 15.0/60.0; // min/min
 uint64_t START_TIME =  0 * 60 + 0; // min
+uint64_t PAUSA_PRANZO = 0 * 60 + 0;
+int64_t PAUSA_PRANZO_IDX = 0;
 
 typedef struct {
     double lat;
@@ -89,6 +92,16 @@ uint64_t lv95_to_tileid(uint64_t E, uint64_t N) {
     uint64_t y = (1302000 - N)/TILE_HEIGHT;
     uint64_t x = (E - 2480000)/TILE_WIDTH;
     return 1000 + y * 20 + x;
+}
+
+uint64_t tileid_coord(uint64_t id, uint64_t* E, uint64_t* N) { // south west
+    // uint64_t y = (1302000 - N)/TILE_HEIGHT;
+    // uint64_t x = (E - 2480000)/TILE_WIDTH;
+    uint64_t x = (id - 1000)%20;
+    uint64_t y = (id - 1000)/20;
+    *E = (x * TILE_WIDTH) + 2480000;
+    *N = -((y * TILE_HEIGHT) - 1302000);
+    // return 1000 + y * 20 + x;
 }
 
 uint64_t get_year(uint64_t id) {
@@ -326,7 +339,13 @@ void calculate_path_segments_data() {
             double time = 60.0 * (ps->kms / FACTOR);
 
             ps->t = (uint64_t) round(time);
-            (ps+1)->pause = (uint64_t) round5(time * PAUSE_FACTOR);
+            
+            if (wp_idx == PAUSA_PRANZO_IDX) {
+                (ps+1)->pause = PAUSA_PRANZO;
+            } else {
+                (ps+1)->pause = (uint64_t) round5(time * PAUSE_FACTOR);
+            }
+
             {
                 size_t min = ps->t % 60;
                 size_t hours = ps->t / 60;
@@ -400,7 +419,7 @@ void print_latex_document(FILE* sink) {
         fprintf(sink, " & & & & ");
         fprintf(sink, "\\multirow{2}{*}{%.1f} &", km);
         fprintf(sink, "\\multirow{2}{*}{%.1f} &", kms);
-        fprintf(sink, "\\multirow{2}{*}{%02ld:%02ld} &", t / 60, t % 60);
+        fprintf(sink, "\\multirow{2}{*}{%02ld:%02ld} &", (t / 60)%24, t % 60);
         fprintf(sink, "\\multirow{2}{*}{} &");
         if (i < waypoints_len-1 && i > 0 && psd.pause > 0) {
             fprintf(sink, "\\multirow{2}{*}{%02ld:%02ld} &", psd.pause / 60, psd.pause % 60);
@@ -485,8 +504,8 @@ void print_latex_document(FILE* sink) {
 
         fprintf(sink, "\\draw[very thin,color=black!10] (0.0,0.0) grid (%.1f,%.1f);\n", PLOT_MAX_X+0.5, PLOT_MAX_Y+0.5);
 
-        fprintf(sink, "\\draw[->] (0,-0.5) -- (0,%.1f) node[above] {$h$};\n", PLOT_MAX_Y+0.5);
-        fprintf(sink, "\\draw[->] (-0.5,0) -- (%.1f,0) node[right] {$km$};\n", PLOT_MAX_X+0.5);
+        fprintf(sink, "\\draw[->] (0,-0.5) -- (0,%.1f) node[above] {$h \\hphantom{i} [m]$};\n", PLOT_MAX_Y+0.2);
+        fprintf(sink, "\\draw[->] (-0.5,0) -- (%.1f,0) node[right] {$s \\hphantom{i} [km]$};\n", PLOT_MAX_X+0.2);
 
         fprintf(sink, "\\filldraw[black] (0,0) rectangle (0.0,0.0) node[anchor=north east]{0};\n");
 
@@ -584,7 +603,7 @@ void print_latex_document(FILE* sink) {
             char map_file[24] = {0};
             snprintf(tiff_file, 15, "%ld.tif", map_ids[i]);
             snprintf(jpg_file, 15, "%ld-0.jpg", map_ids[i]);
-            snprintf(map_file, 24, "map-%ld-%05ld.jpg", map_ids[i], time()%100000);
+            snprintf(map_file, 24, "map-%ld-%05ld.jpg", map_ids[i], time(NULL)%100000);
 
             uint64_t year = get_year(map_ids[0]);
 
@@ -658,10 +677,9 @@ int main(int argc, char* argv[]) {
         scanf("%lf", &pause_factor);
         if (pause_factor > 0) PAUSE_FACTOR = pause_factor/60.0;
 
-        printf(" - Tempo d'inizio [hh:mm]: ");
+        printf(" - Orario di partenza [hh:mm]: ");
         scanf("%zu:%zu", &hours, &mins);
         if (hours >= 0 && mins >= 0) START_TIME = hours * 60 + mins;
-
         // printf("%f %f %ld:%ld\n\n\n", factor, pause_factor, hours, mins);
     }
 
@@ -688,6 +706,20 @@ int main(int argc, char* argv[]) {
     // Retrieve Waypoints
     extract_waypoints(root);
     // printf("Waypoint count:     %ld\n", waypoints_len);
+    {
+        size_t idx = 0;
+        uint64_t hours = 0, mins = 0;
+        printf(" - Waypoint in cui fare pausa pranzo [%d-%ld]: ", 0, waypoints_len-1);
+        scanf("%zu", &idx);
+        // printf("idx: %ld", idx);
+        if (idx < waypoints_len && idx >= 0) {
+            PAUSA_PRANZO_IDX = idx;
+            printf(" - Durata pausa pranzo [hh:mm]: ");
+            scanf("%zu:%zu", &hours, &mins);
+            if (hours >= 0 && mins >= 0)
+                PAUSA_PRANZO = hours * 60 + mins;
+        }
+    }
 
     // Retrieve path
     struct xml_node* track_container = xml_node_child(root, children-1);
