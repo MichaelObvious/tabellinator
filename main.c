@@ -8,9 +8,9 @@
 
 // #define FILE_PATH "path.gpx"
 // #define OUTPUT_FILE_PATH "output.tex"
-#define FACTOR 5.0 // kms/h
-#define PAUSE_FACTOR 15.0/60.0 // min/min
-#define START_TIME 12 * 60 + 0 // min
+double FACTOR = 5.0; // kms/h
+double PAUSE_FACTOR = 15.0/60.0; // min/min
+uint64_t START_TIME =  0 * 60 + 0; // min
 
 typedef struct {
     double lat;
@@ -102,7 +102,7 @@ void wsg84_to_lv95(double phi, double lambda, double* E, double* N) {
 }
 
 void wsg84_to_lv95i(double phi, double lambda, uint64_t* E, uint64_t* N) {
-    double e, n;
+    double e = 0, n = 0;
     wsg84_to_lv95(phi, lambda, &e, &n);
     *E = (uint64_t) round(e);
     *N = (uint64_t) round(n);
@@ -308,7 +308,7 @@ void calculate_path_segments_data() {
                 size_t min = ps->t % 60;
                 size_t hours = ps->t / 60;
 
-                uint64_t E, N;
+                uint64_t E = 0, N = 0;
                 wsg84_to_lv95i(waypoints[wp_idx].lat, waypoints[wp_idx].lon, &E, &N);
                 // printf("Waypoint: %ld %ld\n", E, N);
 
@@ -361,8 +361,8 @@ void print_latex_document(FILE* sink) {
     fprintf(sink, "        \\hline\n");
 
     char wp_name[2] = "  ";
-    uint64_t E, N;
-    double km, kms = 0;
+    uint64_t E = 0, N = 0;
+    double km = 0, kms = 0;
     uint64_t t = START_TIME;
     // assert(waypoints_len == segments_len + 1);
     for (size_t i = 0; i < waypoints_len; i++) {
@@ -405,6 +405,37 @@ void print_latex_document(FILE* sink) {
     }
 
     fprintf(sink, "    \\end{longtable}\n");
+
+    fprintf(sink, "\n");
+    fprintf(sink, "\n");
+    fprintf(sink, "        \\vspace{2ex}\n");
+    fprintf(sink, "\n");
+
+    fprintf(sink, "    \\begin{center}\\begin{tabular}{|c|c|c|c|c|c|c|}\n");
+    fprintf(sink, "        \\hline\n");
+    fprintf(sink, "        \\multicolumn{2}{|c|}{\\multirow{2}{*}{Estremi}} & \\multicolumn{5}{|c|}{\\multirow{2}{*}{Totali}}\\\\\n");
+    fprintf(sink, "        \\multicolumn{2}{|c|}{} & \\multicolumn{5}{|c|}{} \\\\\n");
+    fprintf(sink, "        \\hline\n");
+    fprintf(sink, "        \\multirow{2}{*}{$\\min h$} & \\multirow{2}{*}{$\\max h$} & \\multirow{2}{*}{$\\Delta h^\\uparrow$} & \\multirow{2}{*}{$\\Delta h^\\downarrow$} & \\multirow{2}{*}{$s$} & \\multirow{2}{*}{$kms$} & \\multirow{2}{*}{$t$ (senza pause)} \\\\\n");
+    fprintf(sink, "        &&&&&& \\\\\n");
+    fprintf(sink, "        \\hline\n");
+
+    double minx = 4000, maxx = 0, updh = 0, downdh = 0;
+    for (size_t i = 0; i < path_len; i++) {
+        Point p = path[i];
+        if (p.ele < minx) minx = p.ele;
+        if (p.ele > maxx) maxx = p.ele;
+        if (i > 0) {
+            Point p_ = path[i-1];
+            double dh = p.ele - p_.ele;
+            if (dh > 0) updh += dh; else downdh += dh;
+        }
+    }
+    uint64_t tot_time = (uint64_t) round(60.0 * kms / FACTOR);
+    fprintf(sink, "        \\multirow{2}{*}{%.0f m.s.l.m.} & \\multirow{2}{*}{%.0f m.s.l.m.} & \\multirow{2}{*}{%.0f m} & \\multirow{2}{*}{%.0f m} & \\multirow{2}{*}{%.2f km} & \\multirow{2}{*}{%.2f kms} & \\multirow{2}{*}{%ld h %ld min} \\\\\n", round(minx), round(maxx), round(updh), round(-downdh), km, kms, tot_time/60, tot_time%60);
+    fprintf(sink, "        &&&&&& \\\\\n");
+    fprintf(sink, "        \\hline\n");
+    fprintf(sink, "    \\end{tabular}\\end{center}\n");
 
     fprintf(sink, "\n");
     fprintf(sink, "\\pagebreak\n");
