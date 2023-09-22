@@ -518,6 +518,27 @@ int main(int argc, char* argv[]) {
     }
     snprintf(out_file_path, 128, "%.*s.tex", (int) strlen(file_path)-4, file_path);
 
+    {
+        double factor = 0;
+        double pause_factor = 0;
+        uint64_t hours = 0, mins = 0;
+        printf("Vi prego d'inserire:\n");
+
+        printf(" - Fattore di marcia (kms/h): ");
+        scanf("%lf", &factor);
+        if (factor > 0) FACTOR = factor;
+
+        printf(" - Fattore di pausa (min/h): ");
+        scanf("%lf", &pause_factor);
+        if (pause_factor > 0) PAUSE_FACTOR = pause_factor/60.0;
+
+        printf(" - Tempo d'inizio [hh:mm]: ");
+        scanf("%ld:%ld", &hours, &mins);
+        if (hours >= 0 && mins >= 0) START_TIME = hours * 60 + mins;
+
+        // printf("%f %f %ld:%ld\n\n\n", factor, pause_factor, hours, mins);
+    }
+
     if (load_source(file_path) != 0) {
         return 1;
     }
@@ -580,7 +601,14 @@ int main(int argc, char* argv[]) {
         fclose(out_file);
 
         char command[256] = {0};
-        snprintf(command, 256, "xelatex -interaction=nonstopmode '%s'", out_file_path);
+        snprintf(command, 256, "xelatex -interaction=nonstopmode '%s'"
+#ifdef _WIN32
+        " > nul"
+#endif
+#ifdef __unix__
+        " > /dev/null"
+#endif
+        , out_file_path);
         system(command);
     }
 
