@@ -8,7 +8,7 @@
 
 #define FILE_PATH "path.gpx"
 #define OUTPUT_FILE_PATH "output.tex"
-#define FACTOR 4.0 // kms/h
+#define FACTOR 5.0 // kms/h
 #define PAUSE_FACTOR 15.0/60.0 // min/min
 
 typedef struct {
@@ -43,6 +43,10 @@ size_t path_len = 0;
 #define PATH_SEGMENTS_CAP WAYPOINTS_CAPACITY
 PathSegmentData segments[PATH_SEGMENTS_CAP] = {0};
 size_t segments_len = 0;
+
+inline static double map(double n, double nmin, double nmax, double min, double max) {
+    return ((n - nmin) * (max-min))/(nmax-nmin) + min;
+}
 
 // round to nearest 5 multiple
 inline static double round5(double x) {
@@ -321,11 +325,19 @@ void print_latex_document(FILE* sink) {
     fprintf(sink, "\\usepackage{multirow}\n");
     fprintf(sink, "\\usepackage[margin=%.0fcm]{geometry}\n", DOC_MARGIN);
     fprintf(sink, "\\usepackage{microtype}\n");
-    fprintf(sink, "\\usepackage{longtable}\\");
+    fprintf(sink, "\\usepackage{longtable}\n");
+    fprintf(sink, "\\usepackage{tikz}\n");
+    fprintf(sink, "\\usepgflibrary{plotmarks}\n");
+    
     fprintf(sink, "\n");
     fprintf(sink, "\\begin{document}\n");
+    fprintf(sink, "    \\pagenumbering{gobble}\n");
     fprintf(sink, "    \\begin{center}\n");
-    fprintf(sink, "        \\textbf{\\Huge %s}\n", name);
+    fprintf(sink, "        \\textsc{\\Huge %s}\n", name);
+    fprintf(sink, "\n");
+    fprintf(sink, "        \\vspace{2ex}\n");
+    fprintf(sink, "\n");
+    fprintf(sink, "\\textsc{\\large Tabella di marcia}\n");
     fprintf(sink, "    \\end{center}\n");
     fprintf(sink, "\n");
     fprintf(sink, "\\vspace{2ex}\n");
@@ -389,8 +401,66 @@ void print_latex_document(FILE* sink) {
     }
 
     fprintf(sink, "    \\end{longtable}\n");
+
     fprintf(sink, "\n");
+    fprintf(sink, "\\pagebreak\n");
     fprintf(sink, "\n");
+
+    fprintf(sink, "    \\begin{center}\n");
+    fprintf(sink, "        \\textsc{\\Huge %s}\n", name);
+    fprintf(sink, "\n");
+    fprintf(sink, "        \\vspace{2ex}\n");
+    fprintf(sink, "\n");
+    fprintf(sink, "\\textsc{\\large Profilo altimetrico}\n");
+    fprintf(sink, "    \\end{center}\n");
+
+    fprintf(sink, "\n");
+
+    #define PLOT_MAX_X 30.0
+    #define PLOT_MAX_Y 20.0
+
+    double max_km = km;
+    double max_h = 4000.0;
+
+    fprintf(sink, "    \\begin{center}\\begin{tikzpicture}[x=0.8cm,y=0.8cm, step=0.8cm]\n");
+    
+        fprintf(sink, "\\draw[very thin,color=black!10] (-0.1,-0.1) grid (%.0f,%.0f);\n", PLOT_MAX_X, PLOT_MAX_Y);
+
+        fprintf(sink, "\\draw[->] (0,-0.5) -- (0,%.1f) node[above] {$h$};\n", PLOT_MAX_Y+0.5);
+        fprintf(sink, "\\draw[->] (-0.5,0) -- (%.1f,0) node[right] {$km$};\n", PLOT_MAX_X+0.5);
+
+        fprintf(sink, "\\filldraw[black] (0,0) rectangle (0.0,0.0) node[anchor=north east]{0};\n");
+
+        for (size_t h = 1; h < (size_t) PLOT_MAX_Y + 1; h++) {
+            fprintf(sink, "\\filldraw[black] (-0.05,%ld) rectangle (0.05, %ld) node[anchor=east]{%.0f};\n", h, h, ((double) h /PLOT_MAX_Y) * 4000.0);
+        }
+
+        for (size_t k = 1; k < (size_t) PLOT_MAX_X + 1; k++) {
+            fprintf(sink, "\\filldraw[black] (%ld,-0.05) rectangle (%ld,0.05) node[anchor=north]{%.1f};\n", k, k, ((double) k /PLOT_MAX_X) * km);
+        }
+
+        fprintf(sink, "\\draw plot[smooth] coordinates{");
+
+        double path_x = 0;
+        for (size_t i = 0; i < path_len; i ++) {
+            if (i > 0) path_x += distance(&path[i-1], &path[i]);
+
+            // if (i == 0)
+                fprintf(sink, "(%f, %f) ",
+                    map(path_x, 0, km, 0, PLOT_MAX_X),
+                    map(path[i].ele, 0, 4000.0, 0, PLOT_MAX_Y));
+        }
+        fprintf(sink, "};\n");
+
+        double x = 0;
+        char name[2] = "  ";
+        for (size_t i = 0; i < waypoints_len; i++) {
+            code_name(i, name);
+            fprintf(sink, "\\filldraw[black] (%f,%f) circle (2pt) node[anchor=south west]{%.*s};\n", map(x, 0, km, 0, PLOT_MAX_X), map(waypoints[i].ele, 0, 4000.0, 0, PLOT_MAX_Y), 2, name);
+            x += segments[i].dst;
+        }
+
+    fprintf(sink, "    \\end{tikzpicture}\\end{center}\n");
     fprintf(sink, "\n");
     fprintf(sink, "\\end{document}\n");
 }
@@ -458,6 +528,8 @@ int main(void) {
         fclose(out_file);
         system("xelatex -interaction=nonstopmode output.tex");
     }
+
+    printf("%f\n", map(10.0, 0.0, 20.0, 0.0, 40.0));
 
     return 0;
 }
