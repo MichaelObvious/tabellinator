@@ -6,8 +6,8 @@
 
 #include "xml.c"
 
-#define FILE_PATH "path.gpx"
-#define OUTPUT_FILE_PATH "output.tex"
+// #define FILE_PATH "path.gpx"
+// #define OUTPUT_FILE_PATH "output.tex"
 #define FACTOR 5.0 // kms/h
 #define PAUSE_FACTOR 15.0/60.0 // min/min
 #define START_TIME 12 * 60 + 0 // min
@@ -25,6 +25,8 @@ typedef struct {
     uint64_t t; // minutes
     uint64_t pause; // minutes
 } PathSegmentData;
+
+char out_file_path[128] = {0};
 
 #define MAX_SOURCE_LEN 64 * 1000 * 1000
 char source[MAX_SOURCE_LEN+1] = {0};
@@ -426,7 +428,7 @@ void print_latex_document(FILE* sink) {
 
     fprintf(sink, "    \\begin{center}\\begin{tikzpicture}[x=0.8cm,y=0.8cm, step=0.8cm]\n");
     
-        fprintf(sink, "\\draw[very thin,color=black!10] (-0.1,-0.1) grid (%.0f,%.0f);\n", PLOT_MAX_X, PLOT_MAX_Y);
+        fprintf(sink, "\\draw[very thin,color=black!10] (0.0,0.0) grid (%.1f,%.1f);\n", PLOT_MAX_X+0.5, PLOT_MAX_Y+0.5);
 
         fprintf(sink, "\\draw[->] (0,-0.5) -- (0,%.1f) node[above] {$h$};\n", PLOT_MAX_Y+0.5);
         fprintf(sink, "\\draw[->] (-0.5,0) -- (%.1f,0) node[right] {$km$};\n", PLOT_MAX_X+0.5);
@@ -467,8 +469,25 @@ void print_latex_document(FILE* sink) {
     fprintf(sink, "\\end{document}\n");
 }
 
-int main(void) {
-    if (load_source(FILE_PATH) != 0) {
+void print_usage() {
+    printf("USAGE: ./tabellinator <path/to/file.gpx>");
+}
+
+int main(int argc, char* argv[]) {
+    if (argc < 2) {
+        print_usage();
+        return 0;
+    }
+
+    char* file_path = argv[1];
+
+    if (strcmp(file_path+strlen(file_path)-4, ".gpx") != 0) {
+        fprintf(stderr, "[ERROR] Provided file was not GPX.");
+        return 1;
+    }
+    snprintf(out_file_path, 128, "%.*s.tex", (int) strlen(file_path)-4, file_path);
+
+    if (load_source(file_path) != 0) {
         return 1;
     }
 
@@ -476,7 +495,7 @@ int main(void) {
     assert((*error_free_source == '<') && "Faulty source correction.");
     struct xml_document* document = xml_parse_document(error_free_source, strlen(error_free_source));
     if (!document) {
-		fprintf(stderr, "[ERROR] Could parse file `%s`.\n", FILE_PATH);
+		fprintf(stderr, "[ERROR] Could parse file `%s`.\n", file_path);
 		exit(EXIT_FAILURE);
 	}
 
@@ -519,7 +538,7 @@ int main(void) {
     // Output table
     // Output graph
     // Output latex doc
-    FILE *out_file = fopen(OUTPUT_FILE_PATH, "w");
+    FILE *out_file = fopen(out_file_path, "w");
     if (out_file == NULL) {
         out_file = stdout;
     }
@@ -528,7 +547,10 @@ int main(void) {
     // Create PDF
     if (out_file != stdout) {
         fclose(out_file);
-        system("xelatex -interaction=nonstopmode output.tex");
+
+        char command[256] = {0};
+        snprintf(command, 256, "xelatex -interaction=nonstopmode '%s'", out_file_path);
+        system(command);
     }
 
     return 0;
