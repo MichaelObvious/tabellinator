@@ -436,7 +436,7 @@ void print_latex_document(FILE* sink) {
         }
 
         for (size_t k = 1; k < (size_t) PLOT_MAX_X + 1; k++) {
-            fprintf(sink, "\\filldraw[black] (%ld,-0.05) rectangle (%ld,0.05) node[anchor=north]{%.1f};\n", k, k, ((double) k /PLOT_MAX_X) * km);
+            fprintf(sink, "\\filldraw[black] (%ld,-0.05) rectangle (%ld,0.05) node[anchor=north]{%.1f};\n", k, k, round(((double) k /PLOT_MAX_X) * km * 10.0)/10.0);
         }
 
         fprintf(sink, "\\draw plot[smooth] coordinates{");
