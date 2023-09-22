@@ -10,6 +10,7 @@
 #define OUTPUT_FILE_PATH "output.tex"
 #define FACTOR 5.0 // kms/h
 #define PAUSE_FACTOR 15.0/60.0 // min/min
+#define START_TIME 12 * 60 + 0 // min
 
 typedef struct {
     double lat;
@@ -298,6 +299,7 @@ void calculate_path_segments_data() {
 
         if (distance(&waypoints[wp_idx], &path[i]) <= 0.0001) { // TODO: calculate min ddistance
             double time = 60.0 * (ps->kms / FACTOR);
+
             ps->t = (uint64_t) round(time);
             (ps+1)->pause = (uint64_t) round5(time * PAUSE_FACTOR);
             {
@@ -306,10 +308,10 @@ void calculate_path_segments_data() {
 
                 uint64_t E, N;
                 wsg84_to_lv95i(waypoints[wp_idx].lat, waypoints[wp_idx].lon, &E, &N);
-                printf("Waypoint: %ld %ld\n", E, N);
+                // printf("Waypoint: %ld %ld\n", E, N);
 
 
-                printf("%f km; %f m; %f kms; %ld min (%02ldh %02ldm) - %ld\n", ps->dst, ps->dh, ps->kms, ps->t, hours, min, ps->pause);
+                // printf("%f km; %f m; %f kms; %ld min (%02ldh %02ldm) - %ld\n", ps->dst, ps->dh, ps->kms, ps->t, hours, min, ps->pause);
             }
             wp_idx++;
             segments_len++;
@@ -359,7 +361,7 @@ void print_latex_document(FILE* sink) {
     char wp_name[2] = "  ";
     uint64_t E, N;
     double km, kms = 0;
-    uint64_t t = 0;
+    uint64_t t = START_TIME;
     // assert(waypoints_len == segments_len + 1);
     for (size_t i = 0; i < waypoints_len; i++) {
         Point wp = waypoints[i];
@@ -528,8 +530,6 @@ int main(void) {
         fclose(out_file);
         system("xelatex -interaction=nonstopmode output.tex");
     }
-
-    printf("%f\n", map(10.0, 0.0, 20.0, 0.0, 40.0));
 
     return 0;
 }
