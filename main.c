@@ -353,6 +353,7 @@ void print_latex_document(FILE* sink) {
     fprintf(sink, "\\usepackage[margin=%.0fcm]{geometry}\n", DOC_MARGIN);
     fprintf(sink, "\\usepackage{microtype}\n");
     fprintf(sink, "\\usepackage{longtable}\n");
+    fprintf(sink, "\\usepackage{graphicx}\n");
     fprintf(sink, "\\usepackage{tikz}\n");
     fprintf(sink, "\\usepgflibrary{plotmarks}\n");
     
@@ -511,10 +512,9 @@ void print_latex_document(FILE* sink) {
         fprintf(sink, "};\n");
 
         double x = 0;
-        char name[2] = "  ";
         for (size_t i = 0; i < waypoints_len; i++) {
-            code_name(i, name);
-            fprintf(sink, "\\filldraw[black] (%f,%f) circle (2pt) node[anchor=south west]{%.*s};\n", map(x, 0, km, 0, PLOT_MAX_X), map(waypoints[i].ele, 0, 4000.0, 0, PLOT_MAX_Y), 2, name);
+            code_name(i, wp_name);
+            fprintf(sink, "\\filldraw[black] (%f,%f) circle (2pt) node[anchor=south west]{%.*s};\n", map(x, 0, km, 0, PLOT_MAX_X), map(waypoints[i].ele, 0, 4000.0, 0, PLOT_MAX_Y), 2, wp_name);
             x += segments[i].dst;
         }
 
@@ -523,6 +523,18 @@ void print_latex_document(FILE* sink) {
     fprintf(sink, "\n");
     fprintf(sink, "\\pagebreak\n");
     fprintf(sink, "\n");
+
+    fprintf(sink, "    \\begin{center}\n");
+    fprintf(sink, "        \\textsc{\\Huge %s}\n", name);
+    fprintf(sink, "\n");
+    fprintf(sink, "        \\vspace{2ex}\n");
+    fprintf(sink, "\n");
+    fprintf(sink, "\\textsc{\\large Cartina}\n");
+    fprintf(sink, "    \\end{center}\n");
+
+    fprintf(sink, "\n");
+
+    fprintf(sink, "\\begin{tikzpicture}\n");
 
     {
         uint64_t map_ids[] = {0, 0, 0, 0};
@@ -537,6 +549,19 @@ void print_latex_document(FILE* sink) {
             N = 0;
             E = 0;
         }
+
+        uint64_t width = (maxE - minE) * 7 / 5;
+        uint64_t height = (maxN - minN) * 7 / 5;
+
+        double scalex = (double) TILE_WIDTH / (double) width;
+        double scaley = (double) TILE_HEIGHT / (double) height;
+
+        double scale = (scalex < scaley ? scalex : scaley);
+        if(scale < 1.0) {
+            scale = 1.0;
+        }
+        
+        printf("Scale: %f\n", scale);
         
         map_ids[0] = lv95_to_tileid(minE, minN);
         map_ids[1] = lv95_to_tileid(maxE, minN);
@@ -563,22 +588,20 @@ void print_latex_document(FILE* sink) {
             if (!file_exists(img_file)) {
                 snprintf(get_url_cmd, 255, "curl https://data.geo.admin.ch/ch.swisstopo.pixelkarte-farbe-pk25.noscale/swiss-map-raster25_%ld_%ld/swiss-map-raster25_%ld_%ld_krel_1.25_2056.tif > %s", year, map_ids[0], year, map_ids[0], img_file);
                 system(get_url_cmd);
+            
+                // TODO: load stbi image
+                // TODO: crop image with stbi
+                // TODO: scale image with stbi
+                // TODO: save image as stb
+
             }
+            
+            // fprintf(sink, "\\node[inner sep=0pt] (russell) at (0,0){\\includegraphics[width=\\textwidth]{%s}};\n", img_file);
+            
             // printf("%s\n", url);
         }
 
-        uint64_t width = (maxE - minE) * 7 / 5;
-        uint64_t height = (maxN - minN) * 7 / 5;
-
-        double scalex = (double) TILE_WIDTH / (double) width;
-        double scaley = (double) TILE_HEIGHT / (double) height;
-
-        double scale = (scalex < scaley ? scalex : scaley);
-        if(scale < 1.0) {
-            scale = 1.0;
-        }
-        
-        printf("Scale: %f\n", scale);
+        fprintf(sink, "\\end{tikzpicture}\n");
     }
 
 
