@@ -105,7 +105,7 @@ void wsg84_to_lv95(double phi, double lambda, double* E, double* N) {
         - 10938.51 * lambda_ * phi_
         - 0.36 * lambda_ * phi_ * phi_
         - 44.54 * lambda_ * lambda_ * lambda_;
-    
+
     *N = 1200147.07
         + 308807.95 * phi_
         + 3745.25 * lambda_ * lambda_
@@ -177,9 +177,9 @@ void extract_waypoints(struct xml_node* root) {
     for (size_t i = 1; i < children-1; i++) { // first is metadata, last is track
         Point* wp = &waypoints[waypoints_len++];
         assert(waypoints_len <= WAYPOINTS_CAPACITY);
-        
+
         struct xml_node* waypoint_node = xml_node_child(root, i);
-        
+
 
 
         for (size_t a = 0; a < xml_node_attributes(waypoint_node); a++) {
@@ -207,7 +207,7 @@ void extract_waypoints(struct xml_node* root) {
 
             free(attr_name_str);
         }
-        
+
         size_t cdren = xml_node_children(waypoint_node);
         for (size_t c = 0; c < cdren; ++c) {
             struct xml_node* child = xml_node_child(waypoint_node, c);
@@ -241,9 +241,9 @@ void extract_path(struct xml_node* track) {
         Point* p = &path[path_len++];
         // printf("%ld\n", path_len);
         assert(path_len <= PATH_CAPACITY);
-        
+
         struct xml_node* point_node = xml_node_child(track, i);
-        
+
 
         for (size_t a = 0; a < xml_node_attributes(point_node); a++) {
             struct xml_string* attr_name = xml_node_attribute_name(point_node,a);
@@ -270,7 +270,7 @@ void extract_path(struct xml_node* track) {
 
             free(attr_name_str);
         }
-        
+
         size_t cdren = xml_node_children(point_node);
         for (size_t c = 0; c < cdren; ++c) {
             struct xml_node* child = xml_node_child(point_node, c);
@@ -356,7 +356,7 @@ void print_latex_document(FILE* sink) {
     fprintf(sink, "\\usepackage{graphicx}\n");
     fprintf(sink, "\\usepackage{tikz}\n");
     fprintf(sink, "\\usepgflibrary{plotmarks}\n");
-    
+
     fprintf(sink, "\n");
     fprintf(sink, "\\begin{document}\n");
     fprintf(sink, "    \\pagenumbering{gobble}\n");
@@ -395,7 +395,7 @@ void print_latex_document(FILE* sink) {
         code_name(i, wp_name);
         wsg84_to_lv95i(wp.lat, wp.lon, &E, &N);
         fprintf(sink, "\\multirow{2}{*}{%.*s} & ", 2, wp_name);
-        fprintf(sink, "\\multirow{2}{*}{%'ld %'ld} & ", E, N); 
+        fprintf(sink, "\\multirow{2}{*}{%'ld %'ld} & ", E, N);
         fprintf(sink, "\\multirow{2}{*}{%'.0f} & ", round(wp.ele));
         fprintf(sink, " & & & & ");
         fprintf(sink, "\\multirow{2}{*}{%.1f} &", km);
@@ -419,7 +419,7 @@ void print_latex_document(FILE* sink) {
             km += psd.dst;
             kms += psd.kms;
             t += psd.t + psd.pause;
-            
+
             // fprintf(sink, "&&&&&&&&& \\\\\n");
             fprintf(sink, "        \\cline{1-3}\\cline{8-13} \n");
         } else {
@@ -482,7 +482,7 @@ void print_latex_document(FILE* sink) {
     double max_h = 4000.0;
 
     fprintf(sink, "    \\begin{center}\\begin{tikzpicture}[x=0.8cm,y=0.8cm, step=0.8cm]\n");
-    
+
         fprintf(sink, "\\draw[very thin,color=black!10] (0.0,0.0) grid (%.1f,%.1f);\n", PLOT_MAX_X+0.5, PLOT_MAX_Y+0.5);
 
         fprintf(sink, "\\draw[->] (0,-0.5) -- (0,%.1f) node[above] {$h$};\n", PLOT_MAX_Y+0.5);
@@ -560,9 +560,9 @@ void print_latex_document(FILE* sink) {
         if(scale < 1.0) {
             scale = 1.0;
         }
-        
+
         printf("Scale: %f\n", scale);
-        
+
         map_ids[0] = lv95_to_tileid(minE, minN);
         map_ids[1] = lv95_to_tileid(maxE, minN);
         map_ids[2] = lv95_to_tileid(minE, maxN);
@@ -574,7 +574,7 @@ void print_latex_document(FILE* sink) {
                 if (map_ids[i] == map_ids[j]) {
                     map_ids[j] = 0;
                 }
-            }     
+            }
         }
 
         for (size_t i = 0; i < 4; i++) {
@@ -588,16 +588,16 @@ void print_latex_document(FILE* sink) {
             if (!file_exists(img_file)) {
                 snprintf(get_url_cmd, 255, "curl https://data.geo.admin.ch/ch.swisstopo.pixelkarte-farbe-pk25.noscale/swiss-map-raster25_%ld_%ld/swiss-map-raster25_%ld_%ld_krel_1.25_2056.tif > %s", year, map_ids[0], year, map_ids[0], img_file);
                 system(get_url_cmd);
-            
+
                 // TODO: load stbi image
                 // TODO: crop image with stbi
                 // TODO: scale image with stbi
                 // TODO: save image as stb
 
             }
-            
+
             // fprintf(sink, "\\node[inner sep=0pt] (russell) at (0,0){\\includegraphics[width=\\textwidth]{%s}};\n", img_file);
-            
+
             // printf("%s\n", url);
         }
 
@@ -695,7 +695,7 @@ int main(int argc, char* argv[]) {
     // Calculate time
     // Set pauses
     calculate_path_segments_data();
-    
+
     // Output table
     // Output graph
     // Output latex doc
