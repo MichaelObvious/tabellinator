@@ -94,13 +94,13 @@ uint64_t lv95_to_tileid(uint64_t E, uint64_t N) {
     return 1000 + y * 20 + x;
 }
 
-uint64_t tileid_coord(uint64_t id, uint64_t* E, uint64_t* N) { // south west
+void tileid_coord(uint64_t id, uint64_t* E, uint64_t* N) { // south west
     // uint64_t y = (1302000 - N)/TILE_HEIGHT;
     // uint64_t x = (E - 2480000)/TILE_WIDTH;
     uint64_t x = (id - 1000)%20;
     uint64_t y = (id - 1000)/20;
     *E = (x * TILE_WIDTH) + 2480000;
-    *N = -((y * TILE_HEIGHT) - 1302000);
+    *N = -((y * TILE_HEIGHT) - 1302000) - TILE_HEIGHT;
     // return 1000 + y * 20 + x;
 }
 
@@ -182,7 +182,7 @@ void extract_tour_name(struct xml_node* root) {
     struct xml_string* name_str = xml_node_content(name_node);
 
     assert(xml_string_length(name_str) + 1 <= MAX_STR_SIZE+1 && "Tour name too long.");
-	xml_string_copy(name_str, name, xml_string_length(name_str));
+	xml_string_copy(name_str, (uint8_t*) name, xml_string_length(name_str));
 }
 
 void extract_waypoints(struct xml_node* root) {
@@ -200,20 +200,20 @@ void extract_waypoints(struct xml_node* root) {
             uint8_t* attr_name_str = calloc(xml_string_length(attr_name) + 1, sizeof(uint8_t));
             xml_string_copy(attr_name, attr_name_str, xml_string_length(attr_name));
 
-            if (strcmp(attr_name_str, "lon")==0) {
+            if (strcmp((char*) attr_name_str, "lon")==0) {
                 struct xml_string* attr_content = xml_node_attribute_content(waypoint_node,a);
                 uint8_t* attr_content_str = calloc(xml_string_length(attr_content) + 1, sizeof(uint8_t));
                 xml_string_copy(attr_content, attr_content_str, xml_string_length(attr_content));
 
-                wp->lon = atof(attr_content_str);
+                wp->lon = atof((char*) attr_content_str);
 
                 free(attr_content_str);
-            } else if (strcmp(attr_name_str, "lat")==0) {
+            } else if (strcmp((char*) attr_name_str, "lat")==0) {
                 struct xml_string* attr_content = xml_node_attribute_content(waypoint_node,a);
                 uint8_t* attr_content_str = calloc(xml_string_length(attr_content) + 1, sizeof(uint8_t));
                 xml_string_copy(attr_content, attr_content_str, xml_string_length(attr_content));
 
-                wp->lat = atof(attr_content_str);
+                wp->lat = atof((char*) attr_content_str);
 
                 free(attr_content_str);
             }
@@ -229,12 +229,12 @@ void extract_waypoints(struct xml_node* root) {
             uint8_t* name_str = calloc(xml_string_length(name) + 1, sizeof(uint8_t));
             xml_string_copy(name, name_str, xml_string_length(name));
 
-            if (strcmp(name_str, "ele") == 0) {
+            if (strcmp((char*) name_str, "ele") == 0) {
                 struct xml_string* content = xml_node_content(child);
                 uint8_t* content_str = calloc(xml_string_length(content) + 1, sizeof(uint8_t));
                 xml_string_copy(content, content_str, xml_string_length(content));
 
-                wp->ele = atof(content_str);
+                wp->ele = atof((char*) content_str);
 
                 free(content_str);
                 free(name_str);
@@ -263,20 +263,20 @@ void extract_path(struct xml_node* track) {
             uint8_t* attr_name_str = calloc(xml_string_length(attr_name) + 1, sizeof(uint8_t));
             xml_string_copy(attr_name, attr_name_str, xml_string_length(attr_name));
 
-            if (strcmp(attr_name_str, "lon")==0) {
+            if (strcmp((char*) attr_name_str, "lon")==0) {
                 struct xml_string* attr_content = xml_node_attribute_content(point_node,a);
                 uint8_t* attr_content_str = calloc(xml_string_length(attr_content) + 1, sizeof(uint8_t));
                 xml_string_copy(attr_content, attr_content_str, xml_string_length(attr_content));
 
-                p->lon = atof(attr_content_str);
+                p->lon = atof((char*)attr_content_str);
 
                 free(attr_content_str);
-            } else if (strcmp(attr_name_str, "lat")==0) {
+            } else if (strcmp((char*)attr_name_str, "lat")==0) {
                 struct xml_string* attr_content = xml_node_attribute_content(point_node,a);
                 uint8_t* attr_content_str = calloc(xml_string_length(attr_content) + 1, sizeof(uint8_t));
                 xml_string_copy(attr_content, attr_content_str, xml_string_length(attr_content));
 
-                p->lat = atof(attr_content_str);
+                p->lat = atof((char*)attr_content_str);
 
                 free(attr_content_str);
             }
@@ -292,12 +292,12 @@ void extract_path(struct xml_node* track) {
             uint8_t* name_str = calloc(xml_string_length(name) + 1, sizeof(uint8_t));
             xml_string_copy(name, name_str, xml_string_length(name));
 
-            if (strcmp(name_str, "ele") == 0) {
+            if (strcmp((char*) name_str, "ele") == 0) {
                 struct xml_string* content = xml_node_content(child);
                 uint8_t* content_str = calloc(xml_string_length(content) + 1, sizeof(uint8_t));
                 xml_string_copy(content, content_str, xml_string_length(content));
 
-                p->ele = atof(content_str);
+                p->ele = atof((char*)content_str);
 
                 free(content_str);
                 free(name_str);
@@ -340,18 +340,18 @@ void calculate_path_segments_data() {
 
             ps->t = (uint64_t) round(time);
             
-            if (wp_idx == PAUSA_PRANZO_IDX) {
+            if (wp_idx == (size_t) PAUSA_PRANZO_IDX) {
                 (ps+1)->pause = PAUSA_PRANZO;
             } else {
                 (ps+1)->pause = (uint64_t) round5(time * PAUSE_FACTOR);
             }
 
             {
-                size_t min = ps->t % 60;
-                size_t hours = ps->t / 60;
+                // size_t min = ps->t % 60;
+                // size_t hours = ps->t / 60;
 
-                uint64_t E = 0, N = 0;
-                wsg84_to_lv95i(waypoints[wp_idx].lat, waypoints[wp_idx].lon, &E, &N);
+                // uint64_t E = 0, N = 0;
+                // wsg84_to_lv95i(waypoints[wp_idx].lat, waypoints[wp_idx].lon, &E, &N);
                 // printf("Waypoint: %ld %ld\n", E, N);
 
 
@@ -360,6 +360,170 @@ void calculate_path_segments_data() {
             wp_idx++;
             segments_len++;
         }
+    }
+}
+
+// UNFINISHED
+void print_map(FILE* sink) {
+    fprintf(sink, "\n");
+    fprintf(sink, "\\pagebreak\n");
+    fprintf(sink, "\n");
+
+    fprintf(sink, "    \\begin{center}\n");
+    fprintf(sink, "        \\textsc{\\Huge %s}\n", name);
+    fprintf(sink, "\n");
+    fprintf(sink, "        \\vspace{2ex}\n");
+    fprintf(sink, "\n");
+    fprintf(sink, "\\textsc{\\large Cartina}\n");
+    fprintf(sink, "    \\end{center}\n");
+
+    fprintf(sink, "\n");
+
+    fprintf(sink, "\\begin{tikzpicture}\n");
+
+    {
+        uint64_t map_ids[] = {0, 0, 0, 0};
+        uint64_t minE = 1000000000, maxE = 0, minN = 1000000000, maxN = 0;
+        uint64_t E = 0, N = 0;
+        for (size_t i = 0; i < path_len; i++) {
+            wsg84_to_lv95i(path[i].lat, path[i].lon, &E, &N);
+            if (E < minE) minE = E;
+            if (E > maxE) maxE = E;
+            if (N < minN) minN = N;
+            if (N > maxN) maxN = N;
+            N = 0;
+            E = 0;
+        }
+
+        uint64_t width = (maxE - minE) * 7 / 5;
+        uint64_t height = (maxN - minN) * 7 / 5;
+
+        minE = minE - width / 7;
+        maxE = maxE + width / 7;
+        minN = minN - height / 7;
+        maxN = maxN + height / 7;
+
+        double scalex = (double) TILE_WIDTH / (double) width;
+        double scaley = (double) TILE_HEIGHT / (double) height;
+
+        double scale = (scalex < scaley ? scalex : scaley);
+        if(scale < 1.0) {
+            scale = 1.0;
+        }
+
+        printf("Scale: %f\n", scale);
+
+        map_ids[0] = lv95_to_tileid(minE, minN);
+        map_ids[1] = lv95_to_tileid(maxE, minN);
+        map_ids[2] = lv95_to_tileid(minE, maxN);
+        map_ids[3] = lv95_to_tileid(maxE, maxN);
+        // printf("%ld %ld %ld %ld\n", map_ids[0], map_ids[1], map_ids[2], map_ids[3]);
+
+        for (size_t i = 0; i < 4; i++) {
+            for (size_t j = i + 1; j < 4; j++) {
+                if (map_ids[i] == map_ids[j]) {
+                    map_ids[j] = 0;
+                }
+            }
+        }
+
+        size_t count_maps = 0;
+        for (size_t i = 0; i < 4; i++) {
+            count_maps += map_ids[i] != 0;
+        }
+
+        for (size_t i = 0; i < 4; i++) {
+            if (map_ids[i] == 0) continue;
+
+            char tiff_file[16] = {0};
+            char jpg_file[16] = {0};
+            char map_file[24] = {0};
+            snprintf(tiff_file, 15, "%ld.tif", map_ids[i]);
+            snprintf(jpg_file, 15, "%ld-0.jpg", map_ids[i]);
+            snprintf(map_file, 24, "map-%ld-%05ld.jpg", map_ids[i], time(NULL)%100000);
+
+            uint64_t year = get_year(map_ids[0]);
+
+            if (!file_exists(tiff_file)) {
+                char get_url_cmd[256] = {0};
+                snprintf(get_url_cmd, 255, "curl https://data.geo.admin.ch/ch.swisstopo.pixelkarte-farbe-pk25.noscale/swiss-map-raster25_%ld_%ld/swiss-map-raster25_%ld_%ld_krel_1.25_2056.tif > %s"
+#ifdef _WIN32
+                    " > nul"
+#else
+                    " 2> /dev/null"
+#endif
+                , year, map_ids[0], year, map_ids[0], tiff_file);
+                system(get_url_cmd);
+            }
+
+            if (!file_exists(jpg_file)) {
+
+                char convert_cmd[256] = {0};
+                snprintf(convert_cmd, 255, "magick %s %.*s.jpg"
+#ifdef _WIN32
+                    " > nul"
+#else
+                    " 2> /dev/null"
+#endif
+                , tiff_file, (int) strlen(tiff_file)-4,tiff_file);
+                system(convert_cmd);
+            }
+
+            // cropping
+
+            const uint64_t full_image_size_x = 14000;
+            const uint64_t full_image_size_y = 9600;
+
+            // get the coordinates contained in the map
+            int64_t mapMinE = 0, mapMinN = 0;
+            int64_t mapMaxE = 0, mapMaxN = 0;
+
+            tileid_coord(map_ids[i], (uint64_t*) &mapMinE, (uint64_t*) &mapMinN);
+            mapMaxE = mapMinE + TILE_WIDTH;
+            mapMaxN = mapMinN + TILE_HEIGHT;
+            printf("MAP: %ld %ld %ld %ld\n", mapMinE, mapMinN, mapMaxE, mapMaxN);
+            printf("MINIMAP: %ld %ld %ld %ld\n", minE, minN, maxE, maxN);
+
+            int64_t min_contained_E = 0, min_contained_N = 0;
+            int64_t max_contained_E = 0, max_contained_N = 0;
+
+            min_contained_E = mapMinE > (int64_t) minE ? (int64_t) mapMinE : (int64_t) minE;
+            max_contained_E = mapMaxE < (int64_t) maxE ? (int64_t) mapMaxE : (int64_t) maxE;
+            min_contained_N = mapMinN > (int64_t) minN ? (int64_t) mapMinN : (int64_t) minN;
+            max_contained_N = mapMaxN < (int64_t) maxN ? (int64_t) mapMaxN : (int64_t) maxN;
+            printf("%ld %ld %ld %ld\n", min_contained_E, min_contained_N, max_contained_E, max_contained_N);
+
+            // get the size of the cropped image in pixels
+            uint64_t cropped_image_width =  (uint64_t) ((double) full_image_size_x / scale);
+            uint64_t cropped_image_height = (uint64_t) ((double) full_image_size_y / scale);
+
+            // get the offset from the center of the image
+            double coord_offset_x = (double) (min_contained_E - mapMinE) * 2.0 / (double) TILE_WIDTH;
+            double coord_offset_y = (double) (mapMaxN - max_contained_N) / (double) TILE_HEIGHT;
+            printf("COORD OFFSETS: %f %f\n", coord_offset_x, coord_offset_y);
+            
+            int64_t pixel_offset_x = (int64_t) (coord_offset_x * (double)full_image_size_x );
+            int64_t pixel_offset_y =(int64_t)  (coord_offset_y * (double)full_image_size_y);
+            printf("PX OFFSETS: %ld %ld\n", pixel_offset_x, pixel_offset_y);
+
+            //construct command
+            char call_cmd[256] = {0};
+            snprintf(call_cmd, 256, "magick %s -crop %ldx%ld%+ld%+ld %s", jpg_file, cropped_image_width, cropped_image_height, pixel_offset_x, pixel_offset_y, map_file);
+            // printf("yooo\n");
+            system(call_cmd);
+            // call command
+
+            // assert images are only one
+            // put image in latex
+            // draw path
+            // draw waypoints
+
+            fprintf(sink, "\\node[inner sep=0pt] (russell) at (0,0){\\includegraphics[height=0.9\\textheight]{%s}};\n", map_file);
+
+            // printf("%s\n", url);
+        }
+
+        fprintf(sink, "\\end{tikzpicture}\n");
     }
 }
 
@@ -497,9 +661,6 @@ void print_latex_document(FILE* sink) {
     #define PLOT_MAX_X 30.0
     #define PLOT_MAX_Y 20.0
 
-    double max_km = km;
-    double max_h = 4000.0;
-
     fprintf(sink, "    \\begin{center}\\begin{tikzpicture}[x=0.8cm,y=0.8cm, step=0.8cm]\n");
 
         fprintf(sink, "\\draw[very thin,color=black!10] (0.0,0.0) grid (%.1f,%.1f);\n", PLOT_MAX_X+0.5, PLOT_MAX_Y+0.5);
@@ -539,108 +700,10 @@ void print_latex_document(FILE* sink) {
 
     fprintf(sink, "    \\end{tikzpicture}\\end{center}\n");
 
-    fprintf(sink, "\n");
-    fprintf(sink, "\\pagebreak\n");
-    fprintf(sink, "\n");
-
-    fprintf(sink, "    \\begin{center}\n");
-    fprintf(sink, "        \\textsc{\\Huge %s}\n", name);
-    fprintf(sink, "\n");
-    fprintf(sink, "        \\vspace{2ex}\n");
-    fprintf(sink, "\n");
-    fprintf(sink, "\\textsc{\\large Cartina}\n");
-    fprintf(sink, "    \\end{center}\n");
-
-    fprintf(sink, "\n");
-
-    fprintf(sink, "\\begin{tikzpicture}\n");
-
-    {
-        uint64_t map_ids[] = {0, 0, 0, 0};
-        uint64_t minE = 1000000000, maxE = 0, minN = 1000000000, maxN = 0;
-        uint64_t E = 0, N = 0;
-        for (size_t i = 0; i < path_len; i++) {
-            wsg84_to_lv95i(path[i].lat, path[i].lon, &E, &N);
-            if (E < minE) minE = E;
-            if (E > maxE) maxE = E;
-            if (N < minN) minN = N;
-            if (N > maxN) maxN = N;
-            N = 0;
-            E = 0;
-        }
-
-        uint64_t width = (maxE - minE) * 7 / 5;
-        uint64_t height = (maxN - minN) * 7 / 5;
-
-        double scalex = (double) TILE_WIDTH / (double) width;
-        double scaley = (double) TILE_HEIGHT / (double) height;
-
-        double scale = (scalex < scaley ? scalex : scaley);
-        if(scale < 1.0) {
-            scale = 1.0;
-        }
-
-        printf("Scale: %f\n", scale);
-
-        map_ids[0] = lv95_to_tileid(minE, minN);
-        map_ids[1] = lv95_to_tileid(maxE, minN);
-        map_ids[2] = lv95_to_tileid(minE, maxN);
-        map_ids[3] = lv95_to_tileid(maxE, maxN);
-        // printf("%ld %ld %ld %ld\n", map_ids[0], map_ids[1], map_ids[2], map_ids[3]);
-
-        for (size_t i = 0; i < 4; i++) {
-            for (size_t j = i + 1; j < 4; j++) {
-                if (map_ids[i] == map_ids[j]) {
-                    map_ids[j] = 0;
-                }
-            }
-        }
-
-        for (size_t i = 0; i < 4; i++) {
-            if (map_ids[i] == 0) continue;
-            char tiff_file[16] = {0};
-            char jpg_file[16] = {0};
-            char map_file[24] = {0};
-            snprintf(tiff_file, 15, "%ld.tif", map_ids[i]);
-            snprintf(jpg_file, 15, "%ld-0.jpg", map_ids[i]);
-            snprintf(map_file, 24, "map-%ld-%05ld.jpg", map_ids[i], time(NULL)%100000);
-
-            uint64_t year = get_year(map_ids[0]);
-
-            if (!file_exists(tiff_file)) {
-                char get_url_cmd[256] = {0};
-                snprintf(get_url_cmd, 255, "curl https://data.geo.admin.ch/ch.swisstopo.pixelkarte-farbe-pk25.noscale/swiss-map-raster25_%ld_%ld/swiss-map-raster25_%ld_%ld_krel_1.25_2056.tif > %s"
-#ifdef _WIN32
-                    " > nul"
-#else
-                    " 2> /dev/null"
+#if 0
+    print_map(sink);
 #endif
-                , year, map_ids[0], year, map_ids[0], tiff_file);
-                system(get_url_cmd);
-            }
-
-            if (!file_exists(jpg_file)) {
-
-                char convert_cmd[256] = {0};
-                snprintf(convert_cmd, 255, "magick %s %.*s.jpg"
-#ifdef _WIN32
-                    " > nul"
-#else
-                    " 2> /dev/null"
-#endif
-                , tiff_file, strlen(tiff_file)-4,tiff_file);
-                system(convert_cmd);
-            }
-
-            // fprintf(sink, "\\node[inner sep=0pt] (russell) at (0,0){\\includegraphics[width=\\textwidth]{%s}};\n", img_file);
-
-            // printf("%s\n", url);
-        }
-
-        fprintf(sink, "\\end{tikzpicture}\n");
-    }
-
-
+    
     fprintf(sink, "\\end{document}\n");
 }
 
@@ -679,7 +742,7 @@ int main(int argc, char* argv[]) {
 
         printf(" - Orario di partenza [hh:mm]: ");
         scanf("%zu:%zu", &hours, &mins);
-        if (hours >= 0 && mins >= 0) START_TIME = hours * 60 + mins;
+        if ( (int64_t) hours >= 0 && (int64_t) mins >= 0) START_TIME = hours * 60 + mins;
         // printf("%f %f %ld:%ld\n\n\n", factor, pause_factor, hours, mins);
     }
 
@@ -687,9 +750,9 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    char* error_free_source = source + 22; // for some reason '<?xml version="1.0"?>' makes the parser fail
+    uint8_t* error_free_source = (uint8_t*) source + 22; // for some reason '<?xml version="1.0"?>' makes the parser fail
     assert((*error_free_source == '<') && "Faulty source correction.");
-    struct xml_document* document = xml_parse_document(error_free_source, strlen(error_free_source));
+    struct xml_document* document = xml_parse_document(error_free_source, strlen((char*) error_free_source));
     if (!document) {
 		fprintf(stderr, "[ERROR] Could parse file `%s`.\n", file_path);
 		exit(EXIT_FAILURE);
@@ -712,11 +775,11 @@ int main(int argc, char* argv[]) {
         printf(" - Waypoint in cui fare pausa pranzo [%d-%ld]: ", 0, waypoints_len-1);
         scanf("%zu", &idx);
         // printf("idx: %ld", idx);
-        if (idx < waypoints_len && idx >= 0) {
+        if (idx < waypoints_len && (int64_t) idx >= 0) {
             PAUSA_PRANZO_IDX = idx;
             printf(" - Durata pausa pranzo [hh:mm]: ");
             scanf("%zu:%zu", &hours, &mins);
-            if (hours >= 0 && mins >= 0)
+            if ((int64_t) hours >= 0 && (int64_t) mins >= 0)
                 PAUSA_PRANZO = hours * 60 + mins;
         }
     }
@@ -731,7 +794,7 @@ int main(int argc, char* argv[]) {
             uint8_t* name_str = calloc(xml_string_length(name) + 1, sizeof(uint8_t));
             xml_string_copy(name, name_str, xml_string_length(name));
 
-            if (strcmp(name_str, "trkseg") == 0) {
+            if (strcmp((char*) name_str, "trkseg") == 0) {
                 extract_path(track);
             }
 

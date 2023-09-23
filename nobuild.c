@@ -1,7 +1,7 @@
 #define NOBUILD_IMPLEMENTATION
 #include "./nobuild.h"
 
-#define CFLAGS "-Wall", "-Wextra"
+#define CFLAGS "-Wall", "-Wextra", "-pedantic"
 #define LIBS "-lm"
 
 int main(int argc, char **argv)
