@@ -63,28 +63,6 @@ inline static double deg2rad(double a) {
     return (a / 180.0) * M_PI;
 }
 
-// source: https://en.wikipedia.org/wiki/Geographical_distance#Ellipsoidal_Earth_projected_to_a_plane
-// note: best to use with distances < 475 km
-// input in degrees
-// output in km
-double distance(const Point* a, const Point* b) {
-    const double phia = a->lat;
-    const double phib = b->lat;
-    const double la = a->lon;
-    const double lb = b->lon;
-
-    const double deltaPhi = fabs(phia - phib);
-    const double deltaLambda = fabs(la - lb);
-    const double phi_m = (phia + phib) / 2.0;
-
-    const double K1 = 111.13209 - 0.56605 * cos(2.0 * phi_m) + 0.00120 * cos(4.0 * phi_m);
-    const double K2 = 111.41513 * cos(phi_m) - 0.09455 * cos(3.0 * phi_m) + 0.00012 * cos(5.0 * phi_m);
-
-    const double A = (K1 * deltaPhi);
-    const double B = (K2 * deltaLambda);
-    return sqrt(A * A + B * B);
-}
-
 #define TILE_WIDTH 18000
 #define TILE_HEIGHT 12000
 
@@ -132,6 +110,52 @@ void wsg84_to_lv95i(double phi, double lambda, uint64_t* E, uint64_t* N) {
     wsg84_to_lv95(phi, lambda, &e, &n);
     *E = (uint64_t) round(e);
     *N = (uint64_t) round(n);
+}
+
+
+// source: https://en.wikipedia.org/wiki/Geographical_distance#Ellipsoidal_Earth_projected_to_a_plane
+// note: best to use with distances < 475 km
+// input in degrees
+// output in km
+double distance_wsg84(const Point* a, const Point* b) {
+    const double phia = a->lat;
+    const double phib = b->lat;
+    const double la = a->lon;
+    const double lb = b->lon;
+
+    const double deltaPhi = fabs(phia - phib);
+    const double deltaLambda = fabs(la - lb);
+    const double phi_m = (phia + phib) / 2.0;
+
+    const double K1 = 111.13209 - 0.56605 * cos(2.0 * phi_m) + 0.00120 * cos(4.0 * phi_m);
+    const double K2 = 111.41513 * cos(phi_m) - 0.09455 * cos(3.0 * phi_m) + 0.00012 * cos(5.0 * phi_m);
+
+    const double A = (K1 * deltaPhi);
+    const double B = (K2 * deltaLambda);
+    return sqrt(A * A + B * B);
+}
+
+
+double distance_lv95(const Point* a, const Point *b) {
+    const double phia = a->lat;
+    const double phib = b->lat;
+    const double la = a->lon;
+    const double lb = b->lon;
+
+    double Ea = 0, Eb = 0;
+    double Na = 0, Nb = 0;
+    wsg84_to_lv95(phia, la, &Ea, &Na);
+    wsg84_to_lv95(phib, lb, &Eb, &Nb);
+    
+    const double dE = Ea-Eb;
+    const double dN = Na-Nb;
+
+    return sqrt(dE*dE + dN*dN)/1000.0;
+}
+
+double distance(const Point* a, const Point *b) {
+    // return distance_wsg84(a, b);
+    return distance_lv95(a, b);
 }
 
 void code_name(size_t idx, char code[2]) {
@@ -750,7 +774,9 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    uint8_t* error_free_source = (uint8_t*) source + 22; // for some reason '<?xml version="1.0"?>' makes the parser fail
+    uint8_t* error_free_source = (uint8_t*) source + 1; // for some reason '<?xml version="1.0"?>' makes the parser fail
+    while (*error_free_source != '<') error_free_source++;
+    
     assert((*error_free_source == '<') && "Faulty source correction.");
     struct xml_document* document = xml_parse_document(error_free_source, strlen((char*) error_free_source));
     if (!document) {
