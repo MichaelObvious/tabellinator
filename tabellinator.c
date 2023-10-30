@@ -1,3 +1,11 @@
+#include "emscripten.h"
+#include <assert.h>
+#include <math.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <locale.h>
+#include <time.h>
+
 #include "xml.c"
 
 typedef struct {
@@ -46,14 +54,14 @@ inline static double map(double n, double nmin, double nmax, double min, double 
     return ((n - nmin) * (max-min))/(nmax-nmin) + min;
 }
 
-// round to nearest 5 multiple
+// round to nearest multiple of 5
 inline static double round5(double x) {
     return round(x / 5.0) * 5.0;
 }
 
-inline static double deg2rad(double a) {
-    return (a / 180.0) * M_PI;
-}
+// inline static double deg2rad(double a) {
+//     return (a / 180.0) * M_PI;
+// }
 
 void wsg84_to_lv95(double phi, double lambda, double* E, double* N) {
     #define G2S(x) x * 3600.0
@@ -240,7 +248,12 @@ void extract_path(struct xml_node* track) {
 }
 
 void calculate_path_segments_data() {
-    assert(waypoints_len >= 2);
+    if (waypoints_len < 2) {
+        waypoints[0] = path[0];
+        waypoints[1] = path[path_len-1];
+        waypoints_len = 2;
+    }
+
     size_t wp_idx = 1;
     segments_len = 1;
     for (size_t i = 1; i < path_len; i++) {
@@ -291,184 +304,25 @@ void calculate_path_segments_data() {
     }
 }
 
-void print_latex_document(FILE* sink) {
-    #define DOC_MARGIN 1.0
-    setlocale(LC_NUMERIC, "");
+EMSCRIPTEN_KEEPALIVE int load_source(const char* path) {
+    FILE *fp = fopen(path, "r");
 
-    fprintf(sink, "\\documentclass[a4paper,10pt,landscape]{article}\n");
-    fprintf(sink, "\\usepackage{multirow}\n");
-    fprintf(sink, "\\usepackage[margin=%.0fcm]{geometry}\n", DOC_MARGIN);
-    fprintf(sink, "\\usepackage{microtype}\n");
-    fprintf(sink, "\\usepackage{longtable}\n");
-    fprintf(sink, "\\usepackage{graphicx}\n");
-    fprintf(sink, "\\usepackage{tikz}\n");
-    fprintf(sink, "\\usepgflibrary{plotmarks}\n");
-
-    fprintf(sink, "\n");
-    fprintf(sink, "\\begin{document}\n");
-    fprintf(sink, "    \\pagenumbering{gobble}\n");
-    fprintf(sink, "    \\begin{center}\n");
-    fprintf(sink, "        \\textsc{\\Huge %s}\n", name);
-    fprintf(sink, "\n");
-    fprintf(sink, "        \\vspace{2ex}\n");
-    fprintf(sink, "\n");
-    fprintf(sink, "\\textsc{\\large Tabella di marcia}\n");
-    fprintf(sink, "    \\end{center}\n");
-    fprintf(sink, "\n");
-    fprintf(sink, "\\vspace{2ex}\n");
-    fprintf(sink, "\n");
-    fprintf(sink, "    \\begin{center}\\begin{tabular}{|c|c||c|c|}\n");
-    fprintf(sink, "        \\hline\n");
-    fprintf(sink, "        \\multirow{2}{*}{Fattore di pausa:} & \\multirow{2}{*}{$%0.2f \\hphantom{a} \\frac{min}{h} $} & \\multirow{2}{*}{Fattore di marcia:} & \\multirow{2}{*}{$%0.1f \\hphantom{a} \\frac{kms}{h}$}\\\\\n", PAUSE_FACTOR * 60.0, FACTOR);
-    fprintf(sink, "        &&&\\\\\n");
-    fprintf(sink, "        \\hline\n");
-    fprintf(sink, "    \\end{tabular}\\end{center}\n");
-    fprintf(sink, "\n");
-    fprintf(sink, "    \\begin{longtable}{|c|c|c|c|c|c|c|c|c|c|c|c|c|l|}\n");
-    fprintf(sink, "        \\hline\n");
-    fprintf(sink, "        \\multirow{2}{*}{Nome} & \\multirow{2}{*}{Coord. (LV95)} & \\multirow{2}{*}{Alt. [m]} & \\multirow{2}{*}{$\\Delta h$ [hm]} & \\multirow{2}{*}{$\\Delta s$ [km]} & \\multirow{2}{*}{$\\Delta kms$} & \\multirow{2}{*}{$\\Delta t$ [hh:mm]} & \\multirow{2}{*}{$s$ [km]} & \\multirow{2}{*}{$kms$} & \\multirow{2}{*}{$t$ [hh:mm]} & \\multirow{2}{*}{$t$ [hh:mm]} & \\multirow{2}{*}{Pausa [hh:mm]} & \\multirow{2}{*}{Osservazioni \\hphantom{aaaaaaaaaa}} \\\\\n");
-    fprintf(sink, "        &&&&&&&&&&&&\\\\\n");
-    fprintf(sink, "        \\hline\n");
-    fprintf(sink, "        \\hline\n");
-
-    char wp_name[2] = "  ";
-    double km = 0, kms = 0;
-    uint64_t t = START_TIME;
-    // assert(waypoints_len == segments_len + 1);
-    for (size_t i = 0; i < waypoints_len; i++) {
-        Point wp = waypoints[i];
-        PathSegmentData psd = segments[i];
-        waypoint_name(i, wp_name);
-        fprintf(sink, "\\multirow{2}{*}{%.*s} & ", 2, wp_name);
-        fprintf(sink, "\\multirow{2}{*}{%'ld %'ld} & ", (uint64_t) round(wp.e), (uint64_t) round(wp.n));
-        fprintf(sink, "\\multirow{2}{*}{%'.0f} & ", round(wp.ele));
-        fprintf(sink, " & & & & ");
-        fprintf(sink, "\\multirow{2}{*}{%.1f} &", km);
-        fprintf(sink, "\\multirow{2}{*}{%.1f} &", kms);
-        fprintf(sink, "\\multirow{2}{*}{%02ld:%02ld} &", (t / 60)%24, t % 60);
-        fprintf(sink, "\\multirow{2}{*}{} &");
-        if (i < waypoints_len-1 && i > 0 && psd.pause > 0) {
-            fprintf(sink, "\\multirow{2}{*}{%02ld:%02ld} &", psd.pause / 60, psd.pause % 60);
+    if (fp != NULL) {
+        source_size = fread(source, sizeof(char), MAX_SOURCE_LEN, fp);
+        if (ferror( fp ) != 0) {
+            fprintf(stderr, "[ERROR] Could not load source from `%s`.\n", path);
+            fclose(fp);
+            return -1;
         } else {
-            fprintf(sink, "\\multirow{2}{*}{} &");
+            source[source_size++] = '\0';
         }
-        fprintf(sink, "\\multirow{2}{*}{}\\\\\n");
-        fprintf(sink, "        \\cline{4-7} \n");
-        if (i < waypoints_len-1) {
-            fprintf(sink, " & & & ");
-            fprintf(sink, "\\multirow{2}{*}{%.1f} & ", psd.dh/100.0);
-            fprintf(sink, " \\multirow{2}{*}{%.1f} &", psd.dst);
-            fprintf(sink, " \\multirow{2}{*}{%.1f} &", psd.kms);
-            fprintf(sink, "\\multirow{2}{*}{%02ld:%02ld}&&&&&& \\\\\n", psd.t / 60, psd.t % 60);
 
-            km += psd.dst;
-            kms += psd.kms;
-            t += psd.t + psd.pause;
-
-            // fprintf(sink, "&&&&&&&&& \\\\\n");
-            fprintf(sink, "        \\cline{1-3}\\cline{8-13} \n");
-        } else {
-            fprintf(sink, "&&&&&&&&&&&&\\\\\n");
-            fprintf(sink, "\\hline\n");
-        }
+        fclose(fp);
+    } else {
+        fprintf(stderr, "[ERROR] Could not open file `%s`.\n", path);
     }
 
-    fprintf(sink, "    \\end{longtable}\n");
-
-    fprintf(sink, "\n");
-    fprintf(sink, "\n");
-    fprintf(sink, "        \\vspace{2ex}\n");
-    fprintf(sink, "\n");
-
-    fprintf(sink, "    \\begin{center}\\begin{tabular}{|c|c|c|c|c|c|c|}\n");
-    fprintf(sink, "        \\hline\n");
-    fprintf(sink, "        \\multicolumn{2}{|c|}{\\multirow{2}{*}{Estremi}} & \\multicolumn{5}{|c|}{\\multirow{2}{*}{Totali}}\\\\\n");
-    fprintf(sink, "        \\multicolumn{2}{|c|}{} & \\multicolumn{5}{|c|}{} \\\\\n");
-    fprintf(sink, "        \\hline\n");
-    fprintf(sink, "        \\multirow{2}{*}{$\\min h$} & \\multirow{2}{*}{$\\max h$} & \\multirow{2}{*}{$\\Delta h^\\uparrow$} & \\multirow{2}{*}{$\\Delta h^\\downarrow$} & \\multirow{2}{*}{$s$} & \\multirow{2}{*}{$kms$} & \\multirow{2}{*}{$t$ (senza pause)} \\\\\n");
-    fprintf(sink, "        &&&&&& \\\\\n");
-    fprintf(sink, "        \\hline\n");
-
-    double minx = 4000, maxx = 0, updh = 0, downdh = 0;
-    for (size_t i = 0; i < path_len; i++) {
-        Point p = path[i];
-        if (p.ele < minx) minx = p.ele;
-        if (p.ele > maxx) maxx = p.ele;
-        if (i > 0) {
-            Point p_ = path[i-1];
-            double dh = p.ele - p_.ele;
-            if (dh > 0) updh += dh; else downdh += dh;
-        }
-    }
-    uint64_t tot_time = (uint64_t) round(60.0 * kms / FACTOR);
-    fprintf(sink, "        \\multirow{2}{*}{%.0f m.s.l.m.} & \\multirow{2}{*}{%.0f m.s.l.m.} & \\multirow{2}{*}{%.0f m} & \\multirow{2}{*}{%.0f m} & \\multirow{2}{*}{%.2f km} & \\multirow{2}{*}{%.2f kms} & \\multirow{2}{*}{%ld h %ld min} \\\\\n", round(minx), round(maxx), round(updh), round(-downdh), km, kms, tot_time/60, tot_time%60);
-    fprintf(sink, "        &&&&&& \\\\\n");
-    fprintf(sink, "        \\hline\n");
-    fprintf(sink, "    \\end{tabular}\\end{center}\n");
-
-    fprintf(sink, "\n");
-    fprintf(sink, "\\pagebreak\n");
-    fprintf(sink, "\n");
-
-    fprintf(sink, "    \\begin{center}\n");
-    fprintf(sink, "        \\textsc{\\Huge %s}\n", name);
-    fprintf(sink, "\n");
-    fprintf(sink, "        \\vspace{2ex}\n");
-    fprintf(sink, "\n");
-    fprintf(sink, "\\textsc{\\large Profilo altimetrico}\n");
-    fprintf(sink, "    \\end{center}\n");
-
-    fprintf(sink, "\n");
-
-    #define PLOT_MAX_X 30.0
-    #define PLOT_MAX_Y 20.0
-
-    fprintf(sink, "    \\begin{center}\\begin{tikzpicture}[x=0.8cm,y=0.8cm, step=0.8cm]\n");
-
-        fprintf(sink, "\\draw[very thin,color=black!10] (0.0,0.0) grid (%.1f,%.1f);\n", PLOT_MAX_X+0.5, PLOT_MAX_Y+0.5);
-
-        fprintf(sink, "\\draw[->] (0,-0.5) -- (0,%.1f) node[above] {$h \\hphantom{i} [m]$};\n", PLOT_MAX_Y+0.2);
-        fprintf(sink, "\\draw[->] (-0.5,0) -- (%.1f,0) node[right] {$s \\hphantom{i} [km]$};\n", PLOT_MAX_X+0.2);
-
-        fprintf(sink, "\\filldraw[black] (0,0) rectangle (0.0,0.0) node[anchor=north east]{0};\n");
-
-        for (size_t h = 1; h < (size_t) PLOT_MAX_Y + 1; h++) {
-            fprintf(sink, "\\filldraw[black] (-0.05,%ld) rectangle (0.05, %ld) node[anchor=east]{%.0f};\n", h, h, ((double) h /PLOT_MAX_Y) * 4000.0);
-        }
-
-        for (size_t k = 1; k < (size_t) PLOT_MAX_X + 1; k++) {
-            fprintf(sink, "\\filldraw[black] (%ld,-0.05) rectangle (%ld,0.05) node[anchor=north]{%.1f};\n", k, k, round(((double) k /PLOT_MAX_X) * km * 10.0)/10.0);
-        }
-
-        fprintf(sink, "\\draw plot[smooth] coordinates{");
-
-        double path_x = 0;
-        size_t index_step = path_len / 1000;
-        // printf("PATH OPTIMIZATION: %ld %ld\n", path_len, index_step);
-        for (size_t i = 0; i < path_len; i ++) {
-            if (i > 0) path_x += distance(&path[i-1], &path[i]);
-
-            if (i % index_step == 0 || i == path_len - 1)
-                fprintf(sink, "(%f, %f) ",
-                    map(path_x, 0, km, 0, PLOT_MAX_X),
-                    map(path[i].ele, 0, 4000.0, 0, PLOT_MAX_Y));
-        }
-        fprintf(sink, "};\n");
-
-        double x = 0;
-        for (size_t i = 0; i < waypoints_len; i++) {
-            waypoint_name(i, wp_name);
-            fprintf(sink, "\\filldraw[black] (%f,%f) circle (2pt) node[anchor=south west]{%.*s};\n", map(x, 0, km, 0, PLOT_MAX_X), map(waypoints[i].ele, 0, 4000.0, 0, PLOT_MAX_Y), 2, wp_name);
-            x += segments[i].dst;
-        }
-
-    fprintf(sink, "    \\end{tikzpicture}\\end{center}\n");
-
-#if 0
-    print_map(sink);
-#endif
-    
-    fprintf(sink, "\\end{document}\n");
+    return 0;
 }
 
 uint8_t* fix_source(uint8_t* src) {
@@ -484,11 +338,52 @@ uint8_t* fix_source(uint8_t* src) {
     return src;
 }
 
-void parse_gpx(uint8_t* src, char* file_path) {
+EMSCRIPTEN_KEEPALIVE char* get_source_ptr() {
+    return source;
+}
+
+EMSCRIPTEN_KEEPALIVE void set_source_size(int size) {
+    source_size = (size_t) size;
+}
+
+EMSCRIPTEN_KEEPALIVE int get_max_source_len() {
+    return MAX_SOURCE_LEN;
+}
+
+EMSCRIPTEN_KEEPALIVE char* get_tex_src_ptr() {
+    return out_tex;
+}
+
+EMSCRIPTEN_KEEPALIVE int get_tex_src_size() {
+    return tex_size;
+}
+
+EMSCRIPTEN_KEEPALIVE void set_factor(int x) {
+    FACTOR = (uint64_t) x;
+}
+
+EMSCRIPTEN_KEEPALIVE void set_pause_factor(int x) {
+    PAUSE_FACTOR = x;
+}
+
+EMSCRIPTEN_KEEPALIVE char* get_name_ptr() {
+    return name;
+}
+
+EMSCRIPTEN_KEEPALIVE int get_name_max_size() {
+    return MAX_STR_SIZE;
+}
+
+EMSCRIPTEN_KEEPALIVE void set_start_time(int mins) {
+    START_TIME = (uint64_t) mins;
+}
+
+EMSCRIPTEN_KEEPALIVE int parse_gpx() {
+    uint8_t* src = fix_source((uint8_t*) source);
+
     struct xml_document* document = xml_parse_document(src, strlen((char*) src));
     if (!document) {
-		fprintf(stderr, "[ERROR] Could not parse file `%s`.\n", file_path);
-		exit(EXIT_FAILURE);
+		return -1;
 	}
 
     struct xml_node* root = xml_document_root(document);
@@ -502,20 +397,6 @@ void parse_gpx(uint8_t* src, char* file_path) {
     // Retrieve Waypoints
     extract_waypoints(root);
     // printf("Waypoint count:     %ld\n", waypoints_len);
-    {
-        size_t idx = 0;
-        uint64_t hours = 0, mins = 0;
-        printf(" - Waypoint in cui fare pausa pranzo [%d-%ld]: ", 0, waypoints_len-1);
-        scanf("%zu", &idx);
-        // printf("idx: %ld", idx);
-        if (idx < waypoints_len && (int64_t) idx >= 0) {
-            PAUSA_PRANZO_IDX = idx;
-            printf(" - Durata pausa pranzo [hh:mm]: ");
-            scanf("%zu:%zu", &hours, &mins);
-            if ((int64_t) hours >= 0 && (int64_t) mins >= 0)
-                PAUSA_PRANZO = hours * 60 + mins;
-        }
-    }
 
     // Retrieve path
     struct xml_node* track_container = xml_node_child(root, children-1);
@@ -540,4 +421,186 @@ void parse_gpx(uint8_t* src, char* file_path) {
     // Calculate time
     // Set pauses
     calculate_path_segments_data();
+
+    return 0;
+}
+
+EMSCRIPTEN_KEEPALIVE void print_latex_document() {
+    #define DOC_MARGIN 1.0
+    setlocale(LC_NUMERIC, "");
+
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "\\documentclass[a4paper,10pt,landscape]{article}\n");
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "\\usepackage{multirow}\n");
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "\\usepackage[margin=%.0fcm]{geometry}\n", DOC_MARGIN);
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "\\usepackage{microtype}\n");
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "\\usepackage{longtable}\n");
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "\\usepackage{graphicx}\n");
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "\\usepackage{tikz}\n");
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "\\usepgflibrary{plotmarks}\n");
+
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "\n");
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "\\begin{document}\n");
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "    \\pagenumbering{gobble}\n");
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "    \\begin{center}\n");
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "        \\textsc{\\Huge %s}\n", name);
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "\n");
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "        \\vspace{2ex}\n");
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "\n");
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "\\textsc{\\large Tabella di marcia}\n");
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "    \\end{center}\n");
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "\n");
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "\\vspace{2ex}\n");
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "\n");
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "    \\begin{center}\\begin{tabular}{|c|c||c|c|}\n");
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "        \\hline\n");
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "        \\multirow{2}{*}{Fattore di pausa:} & \\multirow{2}{*}{$%0.2f \\hphantom{a} \\frac{min}{h} $} & \\multirow{2}{*}{Fattore di marcia:} & \\multirow{2}{*}{$%0.1f \\hphantom{a} \\frac{kms}{h}$}\\\\\n", PAUSE_FACTOR * 60.0, FACTOR);
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "        &&&\\\\\n");
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "        \\hline\n");
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "    \\end{tabular}\\end{center}\n");
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "\n");
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "    \\begin{longtable}{|c|c|c|c|c|c|c|c|c|c|c|c|c|l|}\n");
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "        \\hline\n");
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "        \\multirow{2}{*}{Nome} & \\multirow{2}{*}{Coord. (LV95)} & \\multirow{2}{*}{Alt. [m]} & \\multirow{2}{*}{$\\Delta h$ [hm]} & \\multirow{2}{*}{$\\Delta s$ [km]} & \\multirow{2}{*}{$\\Delta kms$} & \\multirow{2}{*}{$\\Delta t$ [hh:mm]} & \\multirow{2}{*}{$s$ [km]} & \\multirow{2}{*}{$kms$} & \\multirow{2}{*}{$t$ [hh:mm]} & \\multirow{2}{*}{$t$ [hh:mm]} & \\multirow{2}{*}{Pausa [hh:mm]} & \\multirow{2}{*}{Osservazioni \\hphantom{aaaaaaaaaa}} \\\\\n");
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "        &&&&&&&&&&&&\\\\\n");
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "        \\hline\n");
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "        \\hline\n");
+
+    char wp_name[2] = "  ";
+    double km = 0, kms = 0;
+    uint64_t t = START_TIME;
+    // assert(waypoints_len == segments_len + 1);
+    for (size_t i = 0; i < waypoints_len; i++) {
+        Point wp = waypoints[i];
+        PathSegmentData psd = segments[i];
+        waypoint_name(i, wp_name);
+        tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "\\multirow{2}{*}{%.*s} & ", 2, wp_name);
+        tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "\\multirow{2}{*}{%'llu %'llu} & ", (uint64_t) round(wp.e), (uint64_t) round(wp.n));
+        tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "\\multirow{2}{*}{%'.0f} & ", round(wp.ele));
+        tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, " & & & & ");
+        tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "\\multirow{2}{*}{%.1f} &", km);
+        tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "\\multirow{2}{*}{%.1f} &", kms);
+        tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "\\multirow{2}{*}{%02llu:%02llu} &", (t / 60)%24, t % 60);
+        tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "\\multirow{2}{*}{} &");
+        if (i < waypoints_len-1 && i > 0 && psd.pause > 0) {
+            tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "\\multirow{2}{*}{%02llu:%02llu} &", psd.pause / 60, psd.pause % 60);
+        } else {
+            tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "\\multirow{2}{*}{} &");
+        }
+        tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "\\multirow{2}{*}{}\\\\\n");
+        tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "        \\cline{4-7} \n");
+        if (i < waypoints_len-1) {
+            tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, " & & & ");
+            tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "\\multirow{2}{*}{%.1f} & ", psd.dh/100.0);
+            tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, " \\multirow{2}{*}{%.1f} &", psd.dst);
+            tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, " \\multirow{2}{*}{%.1f} &", psd.kms);
+            tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "\\multirow{2}{*}{%02llu:%02llu}&&&&&& \\\\\n", psd.t / 60, psd.t % 60);
+
+            km += psd.dst;
+            kms += psd.kms;
+            t += psd.t + psd.pause;
+
+            // tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "&&&&&&&&& \\\\\n");
+            tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "        \\cline{1-3}\\cline{8-13} \n");
+        } else {
+            tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "&&&&&&&&&&&&\\\\\n");
+            tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "\\hline\n");
+        }
+    }
+
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "    \\end{longtable}\n");
+
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "\n");
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "\n");
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "        \\vspace{2ex}\n");
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "\n");
+
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "    \\begin{center}\\begin{tabular}{|c|c|c|c|c|c|c|}\n");
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "        \\hline\n");
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "        \\multicolumn{2}{|c|}{\\multirow{2}{*}{Estremi}} & \\multicolumn{5}{|c|}{\\multirow{2}{*}{Totali}}\\\\\n");
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "        \\multicolumn{2}{|c|}{} & \\multicolumn{5}{|c|}{} \\\\\n");
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "        \\hline\n");
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "        \\multirow{2}{*}{$\\min h$} & \\multirow{2}{*}{$\\max h$} & \\multirow{2}{*}{$\\Delta h^\\uparrow$} & \\multirow{2}{*}{$\\Delta h^\\downarrow$} & \\multirow{2}{*}{$s$} & \\multirow{2}{*}{$kms$} & \\multirow{2}{*}{$t$ (senza pause)} \\\\\n");
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "        &&&&&& \\\\\n");
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "        \\hline\n");
+
+    double minx = 4000, maxx = 0, updh = 0, downdh = 0;
+    for (size_t i = 0; i < path_len; i++) {
+        Point p = path[i];
+        if (p.ele < minx) minx = p.ele;
+        if (p.ele > maxx) maxx = p.ele;
+        if (i > 0) {
+            Point p_ = path[i-1];
+            double dh = p.ele - p_.ele;
+            if (dh > 0) updh += dh; else downdh += dh;
+        }
+    }
+    uint64_t tot_time = (uint64_t) round(60.0 * kms / FACTOR);
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "        \\multirow{2}{*}{%.0f m.s.l.m.} & \\multirow{2}{*}{%.0f m.s.l.m.} & \\multirow{2}{*}{%.0f m} & \\multirow{2}{*}{%.0f m} & \\multirow{2}{*}{%.2f km} & \\multirow{2}{*}{%.2f kms} & \\multirow{2}{*}{%llu h %llu min} \\\\\n", round(minx), round(maxx), round(updh), round(-downdh), km, kms, tot_time/60, tot_time%60);
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "        &&&&&& \\\\\n");
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "        \\hline\n");
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "    \\end{tabular}\\end{center}\n");
+
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "\n");
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "\\pagebreak\n");
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "\n");
+
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "    \\begin{center}\n");
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "        \\textsc{\\Huge %s}\n", name);
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "\n");
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "        \\vspace{2ex}\n");
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "\n");
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "\\textsc{\\large Profilo altimetrico}\n");
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "    \\end{center}\n");
+
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "\n");
+
+    #define PLOT_MAX_X 30.0
+    #define PLOT_MAX_Y 20.0
+
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "    \\begin{center}\\begin{tikzpicture}[x=0.8cm,y=0.8cm, step=0.8cm]\n");
+
+        tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "\\draw[very thin,color=black!10] (0.0,0.0) grid (%.1f,%.1f);\n", PLOT_MAX_X+0.5, PLOT_MAX_Y+0.5);
+
+        tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "\\draw[->] (0,-0.5) -- (0,%.1f) node[above] {$h \\hphantom{i} [m]$};\n", PLOT_MAX_Y+0.2);
+        tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "\\draw[->] (-0.5,0) -- (%.1f,0) node[right] {$s \\hphantom{i} [km]$};\n", PLOT_MAX_X+0.2);
+
+        tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "\\filldraw[black] (0,0) rectangle (0.0,0.0) node[anchor=north east]{0};\n");
+
+        for (size_t h = 1; h < (size_t) PLOT_MAX_Y + 1; h++) {
+            tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "\\filldraw[black] (-0.05,%ld) rectangle (0.05, %ld) node[anchor=east]{%.0f};\n", h, h, ((double) h /PLOT_MAX_Y) * 4000.0);
+        }
+
+        for (size_t k = 1; k < (size_t) PLOT_MAX_X + 1; k++) {
+            tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "\\filldraw[black] (%ld,-0.05) rectangle (%ld,0.05) node[anchor=north]{%.1f};\n", k, k, round(((double) k /PLOT_MAX_X) * km * 10.0)/10.0);
+        }
+
+        tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "\\draw plot[smooth] coordinates{");
+
+        double path_x = 0;
+        size_t index_step = path_len / 1000;
+        // printf("PATH OPTIMIZATION: %ld %ld\n", path_len, index_step);
+        for (size_t i = 0; i < path_len; i ++) {
+            if (i > 0) path_x += distance(&path[i-1], &path[i]);
+
+            if (i % index_step == 0 || i == path_len - 1)
+                tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "(%f, %f) ",
+                    map(path_x, 0, km, 0, PLOT_MAX_X),
+                    map(path[i].ele, 0, 4000.0, 0, PLOT_MAX_Y));
+        }
+        tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "};\n");
+
+        double x = 0;
+        for (size_t i = 0; i < waypoints_len; i++) {
+            waypoint_name(i, wp_name);
+            tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "\\filldraw[black] (%f,%f) circle (2pt) node[anchor=south west]{%.*s};\n", map(x, 0, km, 0, PLOT_MAX_X), map(waypoints[i].ele, 0, 4000.0, 0, PLOT_MAX_Y), 2, wp_name);
+            x += segments[i].dst;
+        }
+
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "    \\end{tikzpicture}\\end{center}\n");
+
+#if 0
+    print_map(sink);
+#endif
+    
+    tex_size += snprintf(out_tex + tex_size, MAX_SOURCE_LEN-tex_size, "\\end{document}\n");
 }

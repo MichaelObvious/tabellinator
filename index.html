@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>tdm</title>
+    <script src="PdfTeXEngine.js"></script>
+    <script src="a.out.js"></script>
+    <script src="index.js"></script>
+    <style>
+        * {
+            -webkit-box-sizing: border-box;
+            -moz-box-sizing: border-box;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: monospace;
+            font-size: larger;
+        }
+        h1 {
+            text-transform: uppercase;
+            text-align: center;
+        }
+        p {
+            text-align: justify;
+        }
+        a {
+            color: black;
+        }
+        table {
+            margin: 0px auto;
+        }
+        td {
+            min-width: 10vh;
+            padding-right: 1vw;
+            padding-left: 1vw;
+            padding-top: 20px;
+        }
+        .doc {
+            width: 50%;
+            margin: 5em auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="doc">
+        <h1>Tabelle di Marcia</h1>
+        <div style="height: 3em;"></div>
+        <table>
+            <tr>
+                <td>File GPX</td>
+                <td><input type="file" name="gpx" id="gpx" accept=".gpx"></td>
+            </tr>
+            <tr>
+                <td>Titolo</td>
+                <td><input type="text" maxlength="125" name="titolo" id="titolo"></td>
+            </tr>
+            <tr>
+                <td colspan="2" style="padding-top: 0;"><em>se lasciato vuoto viene estratto dal file GPX</em></td>
+            </tr>
+            <tr>
+                <td>Fattore di velocità (kms/h)</td>
+                <td><input type="number" step="0.1" min="1" max="25" value="5" name="fdv" id="fdv"></td>
+            </tr>
+            <tr>
+                <td>Fattore di pausa (min/h)</td>
+                <td><input type="number" step="1" min="0" max="60" value="15" name="fdp" id="fdp"></td>
+            </tr>
+            <tr>
+                <td>Orario di partenza</td>
+                <td><input type="time" name="partenza" id="partenza"></td>
+            </tr>
+            <tr>
+                <td colspan="2"><div style="text-align: center;"><input style="padding: 10px; font-weight: bold; font-size: large; font-family: monospace;" type="button" value="Elabora tabella di marcia", id="submit"></div></td>
+            </tr>
+            <!-- <tr>
+                <td colspan="2" style="text-align: center;"><h3>Pausa pranzo</h3></td>
+            </tr>
+            <tr>
+                <td>Tappa della pausa pranzo</td>
+                <td><select name="ppidx" id="ppidx">
+                    <option value="none">Nessuna</option>
+                </select></td>
+            </tr>
+            <tr>
+                <td>Fattore di pausa (min/h)</td>
+                <td><input type="number" step="1" min="0" max="60" value="15" name="fdp" id="fdp"></td>
+            </tr> -->
+        </table>
+        <div style="height: 3em;"></div>
+        <div id="pdfbox">
+        
+        </div>
+    </div>
+</body>
+</html>
