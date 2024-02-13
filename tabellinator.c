@@ -42,20 +42,22 @@ size_t path_len = 0;
 PathSegmentData segments[PATH_SEGMENTS_CAP] = {0};
 size_t segments_len = 0;
 
-inline static double map(double n, double nmin, double nmax, double min, double max) {
+#include "map.c"
+
+inline static double map(const double n, const double nmin, const double nmax, const double min, const double max) {
     return ((n - nmin) * (max-min))/(nmax-nmin) + min;
 }
 
 // round to nearest 5 multiple
-inline static double round5(double x) {
+inline static double round5(const double x) {
     return round(x / 5.0) * 5.0;
 }
 
-inline static double deg2rad(double a) {
+inline static double deg2rad(const double a) {
     return (a / 180.0) * M_PI;
 }
 
-void wsg84_to_lv95(double phi, double lambda, double* E, double* N) {
+void wsg84_to_lv95(const double phi, const double lambda, double* E, double* N) {
     #define G2S(x) x * 3600.0
     double phi_ = (G2S(phi) - 169028.66)/10000.0;
     double lambda_ = (G2S(lambda) - 26782.5)/10000.0;
@@ -74,7 +76,7 @@ void wsg84_to_lv95(double phi, double lambda, double* E, double* N) {
         + 119.79 * phi_ * phi_ * phi_;
 }
 
-void wsg84_to_lv95i(double phi, double lambda, uint64_t* E, uint64_t* N) {
+void wsg84_to_lv95i(const double phi, const double lambda, uint64_t* E, uint64_t* N) {
     double e = 0, n = 0;
     wsg84_to_lv95(phi, lambda, &e, &n);
     *E = (uint64_t) round(e);
@@ -89,7 +91,7 @@ double distance(const Point* a, const Point *b) {
     return sqrt(dE*dE + dN*dN)/1000.0;
 }
 
-void waypoint_name(size_t idx, char name[2]) {
+void waypoint_name(const size_t idx, char name[2]) {
     char letter = ((idx%26) + 'A');
     char number = (idx / 26) + '0';
     if (number == '0') {
@@ -464,9 +466,9 @@ void print_latex_document(FILE* sink) {
 
     fprintf(sink, "    \\end{tikzpicture}\\end{center}\n");
 
-#if 0
+// #if 0
     print_map(sink);
-#endif
+// #endif
     
     fprintf(sink, "\\end{document}\n");
 }
@@ -484,7 +486,7 @@ uint8_t* fix_source(uint8_t* src) {
     return src;
 }
 
-void parse_gpx(uint8_t* src, char* file_path) {
+void parse_gpx(uint8_t* src, const char* file_path) {
     struct xml_document* document = xml_parse_document(src, strlen((char*) src));
     if (!document) {
 		fprintf(stderr, "[ERROR] Could not parse file `%s`.\n", file_path);

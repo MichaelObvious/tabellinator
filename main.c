@@ -40,7 +40,19 @@ int load_source(const char* path) {
     return 0;
 }
 
-void print_usage(char* program) {
+void compile_latex() {
+    char command[256] = {0};
+    snprintf(command, 256, "xelatex -interaction=nonstopmode '%s'"
+#ifdef _WIN32
+    " > nul"
+#else
+    " > /dev/null"
+#endif
+    , out_file_path);
+    system(command);
+}
+
+void print_usage(const char* program) {
     printf("USAGE: %s <path/to/file.gpx>\n", program);
 }
 
@@ -95,21 +107,13 @@ int main(int argc, char* argv[]) {
     if (out_file == NULL) {
         out_file = stdout;
     }
+    
     print_latex_document(out_file);
 
     // Create PDF
     if (out_file != stdout) {
         fclose(out_file);
-
-        char command[256] = {0};
-        snprintf(command, 256, "xelatex -interaction=nonstopmode '%s'"
-#ifdef _WIN32
-        " > nul"
-#else
-        " > /dev/null"
-#endif
-        , out_file_path);
-        system(command);
+        compile_latex();
     }
 
     return 0;
