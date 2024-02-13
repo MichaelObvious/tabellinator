@@ -96,7 +96,7 @@ int main(int argc, char* argv[]) {
     }
 
     uint8_t* error_free_source = fix_source((uint8_t*) source+1);
-    printf("%ld\n", error_free_source-(uint8_t*)source);
+    // printf("%ld\n", error_free_source-(uint8_t*)source);
 
     parse_gpx(error_free_source, file_path);
 
