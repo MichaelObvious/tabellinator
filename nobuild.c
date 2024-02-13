@@ -10,7 +10,7 @@ int main(int argc, char **argv)
 
     Cstr tool_path = PATH("./main.c");
     #ifndef _WIN32
-        CMD("cc", CFLAGS, "-o", "tabellinator", "main.c", LIBS);
+        CMD("cc", CFLAGS, "-o", "tabellinator", "tabellinator.c", LIBS);
     #else
         // CMD("cl.exe", "main.c");
     #endif
