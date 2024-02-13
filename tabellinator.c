@@ -466,9 +466,9 @@ void print_latex_document(FILE* sink) {
 
     fprintf(sink, "    \\end{tikzpicture}\\end{center}\n");
 
-// #if 0
+#if 0
     print_map(sink);
-// #endif
+#endif
     
     fprintf(sink, "\\end{document}\n");
 }
