@@ -358,12 +358,12 @@ EMSCRIPTEN_KEEPALIVE int get_tex_src_size() {
     return tex_size;
 }
 
-EMSCRIPTEN_KEEPALIVE void set_factor(int x) {
-    FACTOR = (uint64_t) x;
+EMSCRIPTEN_KEEPALIVE void set_factor(double x) {
+    FACTOR = x;
 }
 
-EMSCRIPTEN_KEEPALIVE void set_pause_factor(int x) {
-    PAUSE_FACTOR = x;
+EMSCRIPTEN_KEEPALIVE void set_pause_factor(double x) {
+    PAUSE_FACTOR = x / 60.0;
 }
 
 EMSCRIPTEN_KEEPALIVE char* get_name_ptr() {
