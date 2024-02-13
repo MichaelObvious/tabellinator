@@ -482,7 +482,7 @@ uint8_t* fix_source(uint8_t* src) {
     ) && src < (uint8_t*) (source+MAX_SOURCE_LEN)) {
         src++;
     }
-    printf("%d", *src);
+    // printf("%d", *src);
     return src;
 }
 
