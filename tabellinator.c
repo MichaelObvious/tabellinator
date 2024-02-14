@@ -445,7 +445,9 @@ void print_map(FILE* sink) {
 
     fprintf(sink, "\n");
 
-    fprintf(sink, "\\begin{tikzpicture}[image/.style = {text width=0.2\\textwidth, inner sep=0pt, outer sep=0pt}, node distance = 0mm and 0mm] \n");
+    double cell_size = 0.8;
+    fprintf(sink, "\\begin{center}\\begin{tikzpicture}[x=0.8cm,y=0.8cm, step=0.8cm] \n");
+    // fprintf(sink, "\\draw[very thin,color=black!10] (0.0,0.0) grid (%.1lf,-%.1lf);\n", 30.0+0.5, 20.0+0.5);
 
     {
         uint64_t map_ids[] = {0, 0, 0, 0};
@@ -575,22 +577,24 @@ void print_map(FILE* sink) {
                 // printf("%ld %ld %ld %ld\n", min_contained_E, min_contained_N, max_contained_E, max_contained_N);
 
                 // get the size of the cropped image in pixels
-                uint64_t cropped_image_width =  (uint64_t) ((double) full_image_size_x / scale);
-                uint64_t cropped_image_height = (uint64_t) ((double) full_image_size_y / scale);
+                double cropped_map_width = (double) (max_contained_E - min_contained_E) / (double) TILE_WIDTH;
+                double cropped_map_height = (double) (max_contained_N - min_contained_N) /  (double) TILE_HEIGHT;
+                uint64_t cropped_image_width =  (uint64_t) ((double) full_image_size_x * cropped_map_width / scale);
+                uint64_t cropped_image_height = (uint64_t) ((double) full_image_size_y * cropped_map_height / scale);
 
                 // get the offset from the center of the image
-                double coord_offset_x = (double) (min_contained_E - mapMinE) * 2.0 / (double) TILE_WIDTH;
+                double coord_offset_x = (double) (min_contained_E - mapMinE) / (double) TILE_WIDTH;
                 double coord_offset_y = (double) (mapMaxN - max_contained_N) / (double) TILE_HEIGHT;
                 // printf("COORD OFFSETS: %f %f\n", coord_offset_x, coord_offset_y);
                 
-                int64_t pixel_offset_x = (int64_t) (coord_offset_x * (double)full_image_size_x );
-                int64_t pixel_offset_y =(int64_t)  (coord_offset_y * (double)full_image_size_y);
+                int64_t pixel_offset_x = (int64_t) (coord_offset_x * (double)full_image_size_x);
+                int64_t pixel_offset_y = (int64_t)  (coord_offset_y * (double)full_image_size_y);
                 // printf("PX OFFSETS: %ld %ld\n", pixel_offset_x, pixel_offset_y);
 
                 //construct command
                 char call_cmd[256] = {0};
                 snprintf(call_cmd, 256, "magick %s -crop %ldx%ld%+ld%+ld %s", jpg_file, cropped_image_width, cropped_image_height, pixel_offset_x, pixel_offset_y, map_file);
-                // printf("yooo\n");
+                // printf("[CROP] %s\n", call_cmd);
                 system(call_cmd);
                 // call command
 
@@ -598,28 +602,21 @@ void print_map(FILE* sink) {
                 // put image in latex
 
                 // find coordinates in page
-                // double x = (double) min_contained_E / (double) width;
-                // double y = (double) min_contained_N / (double) height;
+                uint64_t center_N = (max_contained_N + min_contained_N) / 2;
+                uint64_t center_E = (max_contained_E + min_contained_E) / 2;
+                double aspect_ratio = (double) width / (double) height;
+                double ax = ((min_contained_E - (double) minE) / (double) height) * 20.0;
+                double ay = (((double) maxN - max_contained_N) / (double) height) * 20.0;
+                double bx = ((max_contained_E - (double) minE) / (double) height) * 20.0;
+                double by = (((double) maxN - min_contained_N) / (double) height) * 20.0;
+                double x = ((center_E - minE) / (double) height) * 20.0;
+                double y = ((maxN - center_N) / (double) height) * 20.0;
                 // find dimensions
-                // double h = ((double) (max_contained_N - min_contained_N) / (double) height) * 0.9 * 40.0 * 4;
+                double w = (((double) (max_contained_E - min_contained_E) / (double) height)) * cell_size * 20.0;
+                double h = (((double) (max_contained_N - min_contained_N) / (double) height)) * cell_size * 20.0;
                 
-                // idk, explore this: https://tex.stackexchange.com/questions/324418/arrange-align-external-images-in-grid-with-tikz
-                printf("%ld",frame_id);
-                if (frame_id == 0) {
-                    fprintf(sink, "\\node[image] (frame%ld) {\\includegraphics[width=\\linewidth]{%s}};\n", frame_id, map_file);
-                } else {
-                    size_t rows = height / TILE_HEIGHT + 2;
-                    size_t cols = width / TILE_WIDTH + 1;
-                    // printf(" %ld %ld\t", rows, cols);
-                    if (n == maxN) {
-                        fprintf(sink, "\\node[image,right=of frame%ld] (frame%ld) {\\includegraphics[width=\\linewidth]{%s}};\n", frame_id-rows, frame_id, map_file);
-                        // printf("right=of frame%ld\n", frame_id-1);
-                    } else {
-                        fprintf(sink, "\\node[image,below=of frame%ld] (frame%ld) {\\includegraphics[width=\\linewidth]{%s}};\n", frame_id-1, frame_id, map_file);
-                        // printf("below=of frame%ld\n", frame_id-cols);
-                    }
-                }
-                    
+                fprintf(sink, "\\node[inner sep=0pt] (russel) at (%lf, -%lf) {\\includegraphics[width=%lfcm, height=%lfcm]{%s}};\n", x, y, w, h, map_file);
+                // fprintf(sink, "\\filldraw[black] (%lf, -%lf) circle (2pt) node[anchor=south west]{%s};\n", x, y, map_file);
                 
                 frame_id += 1;
 
@@ -630,7 +627,11 @@ void print_map(FILE* sink) {
             }
         }
 
-        fprintf(sink, "\\end{tikzpicture}\n");
+        // fprintf(sink, "\\filldraw[red] (%lf,%lf) circle (2pt) node[anchor=south west]{%s};\n", 0.0, 0.0, "A");
+        // fprintf(sink, "\\filldraw[red] (%lf,%lf) circle (2pt) node[anchor=south west]{%s};\n", 20.0, 0.0, "B");
+        // fprintf(sink, "\\filldraw[red] (%lf,%lf) circle (2pt) node[anchor=south west]{%s};\n", 0.0, -20.0, "C");
+        // fprintf(sink, "\\filldraw[red] (%lf,%lf) circle (2pt) node[anchor=south west]{%s};\n", 20.0, -20.0, "D");
+        fprintf(sink, "\\end{tikzpicture}\\end{center}\n");
     }
 }
 
@@ -808,7 +809,7 @@ void print_latex_document(FILE* sink) {
 
     fprintf(sink, "    \\end{tikzpicture}\\end{center}\n");
 
-#if 0
+#if 1
     print_map(sink);
 #endif
     
@@ -832,13 +833,14 @@ void print_usage(const char* program) {
 }
 
 int main(int argc, char* argv[]) {
-    if (argc < 2) {
-        fprintf(stderr, "[ERROR] Pathath to GPX file not provided.\n");
-        print_usage(argv[0]);
-        return 0;
-    }
+    // if (argc < 2) {
+    //     fprintf(stderr, "[ERROR] Path to GPX file not provided.\n");
+    //     print_usage(argv[0]);
+    //     return 0;
+    // }
 
-    char* file_path = argv[1];
+    // char* file_path = argv[1];
+    char* file_path = "Tour-2023-10-10T191219Z.gpx";
 
     if (strcmp(file_path+strlen(file_path)-4, ".gpx") != 0) {
         fprintf(stderr, "[ERROR] Provided file was not GPX.\n");
