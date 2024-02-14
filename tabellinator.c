@@ -847,20 +847,38 @@ void compile_latex() {
 }
 
 void print_usage(const char* program) {
-    printf("USAGE: %s <path/to/file.gpx>\n", program);
+    printf("UTILIZZO: %s <path/to/file.gpx> [--pdf]\n", program);
+    printf("\n");
+    printf("Opzioni:    --pdf       Invoca automaticamente xelatex per generare il file PDF.\n");
+    printf("                        XeLaTeX deve essere installato perché ciò funzioni.\n");
+    printf("            -h,--help   Stampa il messaggio di aiuto, poi termina.\n");
 }
 
 int main(int argc, char* argv[]) {
-    if (argc < 2) {
-        fprintf(stderr, "[ERROR] Path to GPX file not provided.\n");
-        print_usage(argv[0]);
-        return 0;
+    const char* program = *argv;
+    char* file_path = NULL;
+    int build_pdf = 0;
+
+    while (--argc > 0) {
+        argv++;
+
+        if (strcmp(*argv+strlen(*argv)-4, ".gpx") == 0) {
+            file_path = *argv;
+        } else if (strcmp(*argv, "--pdf") == 0) {
+            build_pdf = 1;
+        } else if (strcmp(*argv, "-h") == 0 || strcmp(*argv, "--help") == 0) {
+            print_usage(program);
+            return 0;
+        } else {
+            fprintf(stderr, "[ERRORE] Comando non riconosciuto: '%s'.\n", *argv);
+            print_usage(program);
+            return 1;
+        }
     }
 
-    char* file_path = argv[1];
-
-    if (strcmp(file_path+strlen(file_path)-4, ".gpx") != 0) {
-        fprintf(stderr, "[ERROR] Provided file was not GPX.\n");
+    if (file_path == NULL) {
+        fprintf(stderr, "[ERRORE] Non è stato dato alcun file GPX.\n");
+        print_usage(program);
         return 1;
     }
     snprintf(out_file_path, 128, "%.*s.tex", (int) strlen(file_path)-4, file_path);
@@ -907,7 +925,8 @@ int main(int argc, char* argv[]) {
     // Create PDF
     if (out_file != stdout) {
         fclose(out_file);
-        compile_latex();
+
+        if (build_pdf) compile_latex();
     }
 
     return 0;
