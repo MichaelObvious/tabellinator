@@ -647,10 +647,10 @@ void print_map(FILE* sink) {
                 2, wp_name);
         }
 
-        fprintf(sink, "\\filldraw[red] (%lf,%lf) circle (2pt) node[anchor=south west]{%s};\n", 0.0, 0.0, "A");
-        fprintf(sink, "\\filldraw[red] (%lf,%lf) circle (2pt) node[anchor=south west]{%s};\n", 20.0, 0.0, "B");
-        fprintf(sink, "\\filldraw[red] (%lf,%lf) circle (2pt) node[anchor=south west]{%s};\n", 0.0, -20.0, "C");
-        fprintf(sink, "\\filldraw[red] (%lf,%lf) circle (2pt) node[anchor=south west]{%s};\n", 20.0, -20.0, "D");
+        // fprintf(sink, "\\filldraw[red] (%lf,%lf) circle (2pt) node[anchor=south west]{%s};\n", 0.0, 0.0, "A");
+        // fprintf(sink, "\\filldraw[red] (%lf,%lf) circle (2pt) node[anchor=south west]{%s};\n", 20.0, 0.0, "B");
+        // fprintf(sink, "\\filldraw[red] (%lf,%lf) circle (2pt) node[anchor=south west]{%s};\n", 0.0, -20.0, "C");
+        // fprintf(sink, "\\filldraw[red] (%lf,%lf) circle (2pt) node[anchor=south west]{%s};\n", 20.0, -20.0, "D");
         fprintf(sink, "\\end{tikzpicture}\\end{center}\n");
     }
 }
