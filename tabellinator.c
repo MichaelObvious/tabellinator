@@ -469,6 +469,8 @@ void print_map(FILE* sink) {
         maxE = maxE + width / 7;
         minN = minN - height / 7;
         maxN = maxN + height / 7;
+        printf("MIN %ld %ld\n", minE, minN);
+        printf("MAX %ld %ld\n", maxE, maxN);
 
         double scalex = (double) TILE_WIDTH / (double) width;
         double scaley = (double) TILE_HEIGHT / (double) height;
@@ -478,14 +480,14 @@ void print_map(FILE* sink) {
             scale = 1.0;
         }
 
-        printf("Scale: %f\n", scale);
+        // printf("Scale: %f\n", scale);
 
         map_ids[0] = lv95_to_tileid(minE, minN);
         map_ids[1] = lv95_to_tileid(maxE, minN);
         map_ids[2] = lv95_to_tileid(minE, maxN);
         map_ids[3] = lv95_to_tileid(maxE, maxN);
-        printf("%ld %ld %ld %ld\n", minE, minN, maxE, maxN);
-        printf("%ld %ld %ld %ld\n", map_ids[0], map_ids[1], map_ids[2], map_ids[3]);
+        // printf("%ld %ld %ld %ld\n", minE, minN, maxE, maxN);
+        // printf("%ld %ld %ld %ld\n", map_ids[0], map_ids[1], map_ids[2], map_ids[3]);
 
         for (size_t i = 0; i < 4; i++) {
             for (size_t j = i + 1; j < 4; j++) {
@@ -607,8 +609,8 @@ void print_map(FILE* sink) {
                 // double ay = (((double) maxN - max_contained_N) / (double) height) * 20.0;
                 // double bx = ((max_contained_E - (double) minE) / (double) height) * 20.0;
                 // double by = (((double) maxN - min_contained_N) / (double) height) * 20.0;
-                double x = ((center_E - minE) / (double) height) * 20.0;
-                double y = ((maxN - center_N) / (double) height) * 20.0;
+                double x = map(center_E, minE, minE + height, 0.0, 20.0);
+                double y = map(center_N, maxN, minN, 0.0, 20.0);
                 // find dimensions
                 double w = (((double) (max_contained_E - min_contained_E) / (double) height)) * cell_size * 20.0;
                 double h = (((double) (max_contained_N - min_contained_N) / (double) height)) * cell_size * 20.0;
