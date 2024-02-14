@@ -460,8 +460,6 @@ void print_map(FILE* sink) {
             if (E > maxE) maxE = E;
             if (N < minN) minN = N;
             if (N > maxN) maxN = N;
-            N = 0;
-            E = 0;
         }
 
         uint64_t width = (maxE - minE) * 7 / 5;
@@ -585,7 +583,7 @@ void print_map(FILE* sink) {
                 // get the offset from the center of the image
                 double coord_offset_x = (double) (min_contained_E - mapMinE) / (double) TILE_WIDTH;
                 double coord_offset_y = (double) (mapMaxN - max_contained_N) / (double) TILE_HEIGHT;
-                // printf("COORD OFFSETS: %f %f\n", coord_offset_x, coord_offset_y);
+                // printf("COORD OFFSETS: %f %f\n", coord_offset_x, coord_offset_y);5000
                 
                 int64_t pixel_offset_x = (int64_t) (coord_offset_x * (double)full_image_size_x);
                 int64_t pixel_offset_y = (int64_t)  (coord_offset_y * (double)full_image_size_y);
@@ -605,10 +603,10 @@ void print_map(FILE* sink) {
                 uint64_t center_N = (max_contained_N + min_contained_N) / 2;
                 uint64_t center_E = (max_contained_E + min_contained_E) / 2;
                 double aspect_ratio = (double) width / (double) height;
-                double ax = ((min_contained_E - (double) minE) / (double) height) * 20.0;
-                double ay = (((double) maxN - max_contained_N) / (double) height) * 20.0;
-                double bx = ((max_contained_E - (double) minE) / (double) height) * 20.0;
-                double by = (((double) maxN - min_contained_N) / (double) height) * 20.0;
+                // double ax = ((min_contained_E - (double) minE) / (double) height) * 20.0;
+                // double ay = (((double) maxN - max_contained_N) / (double) height) * 20.0;
+                // double bx = ((max_contained_E - (double) minE) / (double) height) * 20.0;
+                // double by = (((double) maxN - min_contained_N) / (double) height) * 20.0;
                 double x = ((center_E - minE) / (double) height) * 20.0;
                 double y = ((maxN - center_N) / (double) height) * 20.0;
                 // find dimensions
@@ -627,10 +625,30 @@ void print_map(FILE* sink) {
             }
         }
 
-        // fprintf(sink, "\\filldraw[red] (%lf,%lf) circle (2pt) node[anchor=south west]{%s};\n", 0.0, 0.0, "A");
-        // fprintf(sink, "\\filldraw[red] (%lf,%lf) circle (2pt) node[anchor=south west]{%s};\n", 20.0, 0.0, "B");
-        // fprintf(sink, "\\filldraw[red] (%lf,%lf) circle (2pt) node[anchor=south west]{%s};\n", 0.0, -20.0, "C");
-        // fprintf(sink, "\\filldraw[red] (%lf,%lf) circle (2pt) node[anchor=south west]{%s};\n", 20.0, -20.0, "D");
+        fprintf(sink, "\\draw[red] plot[smooth] coordinates{");
+
+        size_t index_step = path_len / 1000;
+        for (size_t i = 0; i < path_len; i ++) {
+            if (i % index_step == 0 || i == path_len - 1)
+                fprintf(sink, "(%f, %f) ",
+                    map(path[i].e, minE, height+minE, 0, 20.0),
+                    map(path[i].n, maxN, minN, 0, -20.0));
+        }
+        fprintf(sink, "};\n");
+
+        char wp_name[2] = {0};
+        for (size_t i = 0; i < waypoints_len; i++) {
+            waypoint_name(i, wp_name);
+            fprintf(sink, "\\filldraw[red] (%f,%f) circle (1pt) node[anchor=south west]{\\footnotesize %.*s};\n",
+                map(waypoints[i].e, minE, height+minE, 0, 20.0),
+                map(waypoints[i].n, maxN, minN, 0, -20.0),
+                2, wp_name);
+        }
+
+        fprintf(sink, "\\filldraw[red] (%lf,%lf) circle (2pt) node[anchor=south west]{%s};\n", 0.0, 0.0, "A");
+        fprintf(sink, "\\filldraw[red] (%lf,%lf) circle (2pt) node[anchor=south west]{%s};\n", 20.0, 0.0, "B");
+        fprintf(sink, "\\filldraw[red] (%lf,%lf) circle (2pt) node[anchor=south west]{%s};\n", 0.0, -20.0, "C");
+        fprintf(sink, "\\filldraw[red] (%lf,%lf) circle (2pt) node[anchor=south west]{%s};\n", 20.0, -20.0, "D");
         fprintf(sink, "\\end{tikzpicture}\\end{center}\n");
     }
 }
