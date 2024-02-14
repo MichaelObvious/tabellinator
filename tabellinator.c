@@ -827,7 +827,7 @@ void print_latex_document(FILE* sink) {
 
     fprintf(sink, "    \\end{tikzpicture}\\end{center}\n");
 
-#if 1
+#if 0
     print_map(sink);
 #endif
     
@@ -851,14 +851,13 @@ void print_usage(const char* program) {
 }
 
 int main(int argc, char* argv[]) {
-    // if (argc < 2) {
-    //     fprintf(stderr, "[ERROR] Path to GPX file not provided.\n");
-    //     print_usage(argv[0]);
-    //     return 0;
-    // }
+    if (argc < 2) {
+        fprintf(stderr, "[ERROR] Path to GPX file not provided.\n");
+        print_usage(argv[0]);
+        return 0;
+    }
 
-    // char* file_path = argv[1];
-    char* file_path = "Tour-2023-10-10T191219Z.gpx";
+    char* file_path = argv[1];
 
     if (strcmp(file_path+strlen(file_path)-4, ".gpx") != 0) {
         fprintf(stderr, "[ERROR] Provided file was not GPX.\n");
