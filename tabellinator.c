@@ -29,10 +29,8 @@ typedef struct {
 } PathSegmentData;
 
 double FACTOR = 5.0; // kms/h
-double PAUSE_FACTOR = 15.0/60.0; // min/min
+double ADJUSTMENT_FACTOR = 1.2; // because of too much precision
 uint64_t START_TIME =  0 * 60 + 0; // min
-uint64_t PAUSA_PRANZO = 0 * 60 + 0;
-int64_t PAUSA_PRANZO_IDX = 0;
 
 char out_file_path[128] = {0};
 
@@ -49,6 +47,10 @@ char name[MAX_STR_SIZE+1] = {0};
 #define WAYPOINTS_CAPACITY 128
 Point waypoints[WAYPOINTS_CAPACITY] = {0};
 size_t waypoints_len = 0;
+
+#define PAUSES_CAPACITY 128
+uint64_t pauses[PAUSES_CAPACITY] = {0};
+size_t pauses_len = 0;
 
 #define PATH_CAPACITY 128 * 1000
 Point path[PATH_CAPACITY] = {0};
@@ -105,15 +107,20 @@ double distance(const Point* a, const Point *b) {
     return sqrt(dE*dE + dN*dN)/1000.0;
 }
 
-void waypoint_name(const size_t idx, char name[2]) {
+// returns the actual length of the name
+size_t waypoint_name(const size_t idx, char name[2]) {
+    size_t length = 2;
     char letter = ((idx%26) + 'A');
     char number = (idx / 26) + '0';
+
     if (number == '0') {
         number = ' ';
+        length = 1;
     }
     assert(number <= '9' && "Too many waypoints");
     name[0] = letter;
     name[1] = number;
+    return length;
 }
 
 int file_exists(const char *path) {
@@ -299,6 +306,17 @@ void extract_path(struct xml_node* track) {
     }
 }
 
+double calculate_kms(double dst, double dh) {
+    double pendenza = dh/dst;
+    double kms = dst;
+    if (pendenza > 0) {
+        kms += dh / 100.0;
+    } else if (pendenza < -0.2) {
+        kms += -dh / 150.0;
+    }
+    return kms;
+}
+
 void calculate_path_segments_data() {
     assert(waypoints_len >= 2);
     size_t wp_idx = 1;
@@ -310,13 +328,7 @@ void calculate_path_segments_data() {
         Point* pb = &path[i];
         double dst = distance(pa, pb);
         double dh = pb->ele - pa->ele;
-        double pendenza = dh/dst;
-        double kms = dst;
-        if (pendenza > 0) {
-            kms += dh / 100.0;
-        } else if (pendenza < -0.2) {
-            kms += -dh / 150.0;
-        }
+        double kms = calculate_kms(dst, dh);
 
 
         ps->dst += dst;
@@ -324,15 +336,10 @@ void calculate_path_segments_data() {
         ps->kms += kms;
 
         if (distance(&waypoints[wp_idx], &path[i]) <= 0.0001) { // TODO: calculate min ddistance
-            double time = 60.0 * (ps->kms / FACTOR);
+            double time = 60.0 * (ps->kms / (FACTOR * ADJUSTMENT_FACTOR));
 
             ps->t = (uint64_t) round(time);
-            
-            if (wp_idx == (size_t) PAUSA_PRANZO_IDX) {
-                (ps+1)->pause = PAUSA_PRANZO;
-            } else {
-                (ps+1)->pause = (uint64_t) round5(time * PAUSE_FACTOR);
-            }
+            (ps+1)->pause = pauses[wp_idx];
 
             {
                 // size_t min = ps->t % 60;
@@ -368,20 +375,19 @@ void parse_gpx(uint8_t* src, const char* file_path) {
 
     // Retrieve Waypoints
     extract_waypoints(root);
-    // printf("Waypoint count:     %ld\n", waypoints_len);
-    {
-        size_t idx = 0;
+    // printf("Numero di waypoints: %ld\n", waypoints_len);
+    pauses_len = waypoints_len;
+
+    char wp_name[2] = {0};
+    for (size_t i = 1; i < waypoints_len-1; i++) {
         uint64_t hours = 0, mins = 0;
-        printf(" - Waypoint in cui fare pausa pranzo [%d-%ld]: ", 0, waypoints_len-1);
-        scanf("%zu", &idx);
-        // printf("idx: %ld", idx);
-        if (idx < waypoints_len && (int64_t) idx >= 0) {
-            PAUSA_PRANZO_IDX = idx;
-            printf(" - Durata pausa pranzo [hh:mm]: ");
-            scanf("%zu:%zu", &hours, &mins);
-            if ((int64_t) hours >= 0 && (int64_t) mins >= 0)
-                PAUSA_PRANZO = hours * 60 + mins;
-        }
+        size_t wp_name_len = waypoint_name(i, wp_name);
+
+        printf(" - Pausa al punto '%.*s' (%ld/%ld) [hh:mm]: ", (int) wp_name_len, wp_name, i + 1, waypoints_len);
+        scanf("%zu:%zu", &hours, &mins);
+
+        if ((int64_t) hours >= 0 && (int64_t) mins >= 0)
+            pauses[i] = hours * 60 + mins;
     }
 
     // Retrieve path
@@ -410,8 +416,8 @@ void parse_gpx(uint8_t* src, const char* file_path) {
 }
 
 uint64_t lv95_to_tileid(const uint64_t E, const uint64_t N) {
-    uint64_t y = (1302000 - N)/TILE_HEIGHT;
-    uint64_t x = (E - 2480000)/TILE_WIDTH;
+    uint64_t y = (1302000 - N - 1)/TILE_HEIGHT;
+    uint64_t x = (E + 1 - 2480000)/TILE_WIDTH;
     return 1000 + y * 20 + x;
 }
 
@@ -480,36 +486,20 @@ void print_map(FILE* sink) {
             scale = 1.0;
         }
 
-        // printf("Scale: %f\n", scale);
-
-        map_ids[0] = lv95_to_tileid(minE, minN);
-        map_ids[1] = lv95_to_tileid(maxE, minN);
-        map_ids[2] = lv95_to_tileid(minE, maxN);
-        map_ids[3] = lv95_to_tileid(maxE, maxN);
-        // printf("%ld %ld %ld %ld\n", minE, minN, maxE, maxN);
-        // printf("%ld %ld %ld %ld\n", map_ids[0], map_ids[1], map_ids[2], map_ids[3]);
-
-        for (size_t i = 0; i < 4; i++) {
-            for (size_t j = i + 1; j < 4; j++) {
-                if (map_ids[i] == map_ids[j]) {
-                    map_ids[j] = 0;
-                }
-            }
-        }
-
-        size_t count_maps = 0;
-        for (size_t i = 0; i < 4; i++) {
-            count_maps += map_ids[i] != 0;
-        }
-
         size_t t = time(NULL);
 
         size_t checked_ids_size = 0;
         uint64_t checked_ids[32] = {0};
         size_t frame_id = 0;
-        for (uint64_t e = minE; e <= maxE; e += (TILE_WIDTH / 2)) {
-            for (uint64_t n = maxN; n >= minN; n -= (TILE_HEIGHT / 2)) {
+        const size_t step_divisor = (TILE_WIDTH / width) * 10;
+        for (uint64_t e = minE; e <= maxE; e += (TILE_WIDTH / step_divisor)) {
+            for (uint64_t n = maxN; n >= minN; n -= (TILE_HEIGHT / step_divisor)) {
                 uint64_t id = lv95_to_tileid(e, n);
+                uint64_t e2 = 0, n2 = 0;
+                tileid_coord(id, &e2, &n2);
+                // printf("%ld %ld -> %ld %ld\n", e, n, e2, n2);
+                // printf("    %ld %ld -> %ld %ld\n", e - e2, n - n2, TILE_WIDTH, TILE_HEIGHT);
+                // printf("    %ld %ld\n", id, lv95_to_tileid(e2+1, n2+1));
 
                 int checked = 0;
                 for (size_t i = 0; i < checked_ids_size; i++) {
@@ -522,7 +512,7 @@ void print_map(FILE* sink) {
                 char jpg_file[16] = {0};
                 char map_file[24] = {0};
                 snprintf(tiff_file, 15, "%ld.tif", id);
-                snprintf(jpg_file, 15, "%ld-2.jpg", id);
+                snprintf(jpg_file, 15, "%ld-0.jpg", id);
                 snprintf(map_file, 24, "map-%ld-%05ld.jpg", id, t%100000);
 
                 uint64_t year = get_year(id);
@@ -554,8 +544,8 @@ void print_map(FILE* sink) {
 
                 // cropping
 
-                const uint64_t full_image_size_x = 3500;
-                const uint64_t full_image_size_y = 2400;
+                const uint64_t full_image_size_x = 14000;
+                const uint64_t full_image_size_y = 9600;
 
                 // get the coordinates contained in the map
                 int64_t mapMinE = 0, mapMinN = 0;
@@ -579,8 +569,8 @@ void print_map(FILE* sink) {
                 // get the size of the cropped image in pixels
                 double cropped_map_width = (double) (max_contained_E - min_contained_E) / (double) TILE_WIDTH;
                 double cropped_map_height = (double) (max_contained_N - min_contained_N) /  (double) TILE_HEIGHT;
-                uint64_t cropped_image_width =  (uint64_t) ((double) full_image_size_x * cropped_map_width / scale);
-                uint64_t cropped_image_height = (uint64_t) ((double) full_image_size_y * cropped_map_height / scale);
+                uint64_t cropped_image_width =  (uint64_t) ((double) full_image_size_x * cropped_map_width);
+                uint64_t cropped_image_height = (uint64_t) ((double) full_image_size_y * cropped_map_height);
 
                 // get the offset from the center of the image
                 double coord_offset_x = (double) (min_contained_E - mapMinE) / (double) TILE_WIDTH;
@@ -629,7 +619,7 @@ void print_map(FILE* sink) {
 
         fprintf(sink, "\\draw[red] plot[smooth] coordinates{");
 
-        size_t index_step = path_len / 1000;
+        size_t index_step = 1;// path_len / 1000;
         for (size_t i = 0; i < path_len; i ++) {
             if (i % index_step == 0 || i == path_len - 1)
                 fprintf(sink, "(%f, %f) ",
@@ -682,10 +672,10 @@ void print_latex_document(FILE* sink) {
     fprintf(sink, "\n");
     fprintf(sink, "\\vspace{2ex}\n");
     fprintf(sink, "\n");
-    fprintf(sink, "    \\begin{center}\\begin{tabular}{|c|c||c|c|}\n");
+    fprintf(sink, "    \\begin{center}\\begin{tabular}{|c|c|}\n");
     fprintf(sink, "        \\hline\n");
-    fprintf(sink, "        \\multirow{2}{*}{Fattore di pausa:} & \\multirow{2}{*}{$%0.2f \\hphantom{a} \\frac{min}{h} $} & \\multirow{2}{*}{Fattore di marcia:} & \\multirow{2}{*}{$%0.1f \\hphantom{a} \\frac{kms}{h}$}\\\\\n", PAUSE_FACTOR * 60.0, FACTOR);
-    fprintf(sink, "        &&&\\\\\n");
+    fprintf(sink, "        \\multirow{2}{*}{Fattore di marcia:} & \\multirow{2}{*}{$%0.1f \\hphantom{a} \\frac{kms}{h}$}\\\\\n", FACTOR);
+    fprintf(sink, "        &\\\\\n");
     fprintf(sink, "        \\hline\n");
     fprintf(sink, "    \\end{tabular}\\end{center}\n");
     fprintf(sink, "\n");
@@ -765,7 +755,7 @@ void print_latex_document(FILE* sink) {
             if (dh > 0) updh += dh; else downdh += dh;
         }
     }
-    uint64_t tot_time = (uint64_t) round(60.0 * kms / FACTOR);
+    uint64_t tot_time = (uint64_t) round(60.0 * kms / (FACTOR * ADJUSTMENT_FACTOR));
     fprintf(sink, "        \\multirow{2}{*}{%.0f m.s.l.m.} & \\multirow{2}{*}{%.0f m.s.l.m.} & \\multirow{2}{*}{%.0f m} & \\multirow{2}{*}{%.0f m} & \\multirow{2}{*}{%.2f km} & \\multirow{2}{*}{%.2f kms} & \\multirow{2}{*}{%ld h %ld min} \\\\\n", round(minx), round(maxx), round(updh), round(-downdh), km, kms, tot_time/60, tot_time%60);
     fprintf(sink, "        &&&&&& \\\\\n");
     fprintf(sink, "        \\hline\n");
@@ -805,18 +795,40 @@ void print_latex_document(FILE* sink) {
             fprintf(sink, "\\filldraw[black] (%ld,-0.05) rectangle (%ld,0.05) node[anchor=north]{%.1f};\n", k, k, round(((double) k /PLOT_MAX_X) * km * 10.0)/10.0);
         }
 
-        fprintf(sink, "\\draw plot[smooth] coordinates{");
-
-        double path_x = 0;
-        size_t index_step = path_len / 1000;
+        size_t index_step = 1; //path_len / 1000;
         // printf("PATH OPTIMIZATION: %ld %ld\n", path_len, index_step);
-        for (size_t i = 0; i < path_len; i ++) {
-            if (i > 0) path_x += distance(&path[i-1], &path[i]);
+        // fprintf(sink, "\\draw plot[smooth] coordinates{(0,0) ");
+        // {
+        //     double path_x = 0;
+        //     double path_kms;
+        //     for (size_t i = 0; i < path_len; i ++) {
+        //         if (i > 0) {
+        //             double dst = distance(&path[i-1], &path[i]);
+        //             double dh = path[i].ele - path[i-1].ele;
+        //             path_x += dst;
 
-            if (i % index_step == 0 || i == path_len - 1)
-                fprintf(sink, "(%f, %f) ",
-                    map(path_x, 0, km, 0, PLOT_MAX_X),
-                    map(path[i].ele, 0, 4000.0, 0, PLOT_MAX_Y));
+        //             path_kms += calculate_kms(dst, dh);
+        //         }
+
+        //         if (i % index_step == 0 || i == path_len - 1)
+        //             fprintf(sink, "(%f, %f) ",
+        //                 map(path_x, 0, km, 0, PLOT_MAX_X),
+        //                 map(path_kms, 0, kms, 0, PLOT_MAX_Y));
+        //     }
+        // }
+        // fprintf(sink, "};\n");
+
+        fprintf(sink, "\\draw plot[smooth] coordinates{");
+        {
+            double path_x = 0;
+            for (size_t i = 0; i < path_len; i ++) {
+                if (i > 0) path_x += distance(&path[i-1], &path[i]);
+
+                if (i % index_step == 0 || i == path_len - 1)
+                    fprintf(sink, "(%f, %f) ",
+                        map(path_x, 0, km, 0, PLOT_MAX_X),
+                        map(path[i].ele, 0, 4000.0, 0, PLOT_MAX_Y));
+            }
         }
         fprintf(sink, "};\n");
 
@@ -887,7 +899,6 @@ int main(int argc, char* argv[]) {
 
     {
         double factor = 0;
-        double pause_factor = 0;
         uint64_t hours = 0, mins = 0;
         printf("Vi prego d'inserire:\n");
 
@@ -895,14 +906,10 @@ int main(int argc, char* argv[]) {
         scanf("%lf", &factor);
         if (factor > 0) FACTOR = factor;
 
-        printf(" - Fattore di pausa (min/h): ");
-        scanf("%lf", &pause_factor);
-        if (pause_factor > 0) PAUSE_FACTOR = pause_factor/60.0;
-
         printf(" - Orario di partenza [hh:mm]: ");
         scanf("%zu:%zu", &hours, &mins);
         if ( (int64_t) hours >= 0 && (int64_t) mins >= 0) START_TIME = hours * 60 + mins;
-        // printf("%f %f %ld:%ld\n\n\n", factor, pause_factor, hours, mins);
+        // printf("%f %ld:%ld\n\n\n", factor, hours, mins);
     }
 
     if (load_source(file_path) != 0) {
