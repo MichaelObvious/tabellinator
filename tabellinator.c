@@ -12,7 +12,7 @@
     #define M_PI 3.14159265358979323846
 #endif
 
-#define TILE_WIDTH 18000
+#define TILE_WIDTH 17500
 #define TILE_HEIGHT 12000
 
 typedef struct {
@@ -418,7 +418,7 @@ void parse_gpx(uint8_t* src, const char* file_path) {
 
 uint64_t lv95_to_tileid(const uint64_t E, const uint64_t N) {
     uint64_t y = (1302000 - N - 1)/TILE_HEIGHT;
-    uint64_t x = (E + 1 - 2480000)/TILE_WIDTH;
+    uint64_t x = (E + 1 - 2479000)/TILE_WIDTH;
     return 1000 + y * 20 + x;
 }
 
@@ -427,7 +427,7 @@ void tileid_coord(const uint64_t id, uint64_t* E, uint64_t* N) { // south west
     // uint64_t x = (E - 2480000)/TILE_WIDTH;
     uint64_t x = (id - 1000)%20;
     uint64_t y = (id - 1000)/20;
-    *E = (x * TILE_WIDTH) + 2480000;
+    *E = (x * TILE_WIDTH) + 2479000;
     *N = -((y * TILE_HEIGHT) - 1302000) - TILE_HEIGHT;
     // return 1000 + y * 20 + x;
 }
