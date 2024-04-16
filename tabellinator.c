@@ -513,9 +513,6 @@ void print_map(FILE* sink) {
         uint64_t height = (maxN - minN) * 7 / 5;
 
         fprintf(sink, "\\begin{center}\n");
-        if (height > width) {
-            fprintf(sink, "\\begin{rotate}{90}\n");
-        }
 
         minE = minE - width / 7;
         maxE = maxE + width / 7;
@@ -533,7 +530,16 @@ void print_map(FILE* sink) {
         }
 
         double cell_size = 0.8;
-        fprintf(sink, "\\begin{center}\\begin{tikzpicture}[x=0.8cm,y=0.8cm, step=0.8cm, highpoint/.style={fill=black, regular polygon, regular polygon sides=3, inner sep=1pt}] \n");
+        fprintf(sink, "\\begin{center}\n\\vfill\n\\begin{tikzpicture}[x=0.8cm,y=0.8cm, step=0.8cm");
+        if (height > width) {
+            fprintf(sink, ",rotate=90, transform shape");
+        }
+        fprintf(sink, "] \n");
+
+        double max_size = 20.0;
+        // if (height > width) {
+        //     max_size = 30.0;
+        // }
         // fprintf(sink, "\\draw[very thin,color=black!10] (0.0,0.0) grid (%.1lf,-%.1lf);\n", 30.0+0.5, 20.0+0.5);
 
         size_t t = time(NULL);
@@ -647,16 +653,15 @@ void print_map(FILE* sink) {
                 // find coordinates in page
                 uint64_t center_N = (max_contained_N + min_contained_N) / 2;
                 uint64_t center_E = (max_contained_E + min_contained_E) / 2;
-                double aspect_ratio = (double) width / (double) height;
                 // double ax = ((min_contained_E - (double) minE) / (double) height) * 20.0;
                 // double ay = (((double) maxN - max_contained_N) / (double) height) * 20.0;
                 // double bx = ((max_contained_E - (double) minE) / (double) height) * 20.0;
                 // double by = (((double) maxN - min_contained_N) / (double) height) * 20.0;
-                double x = map(center_E, minE, minE + height, 0.0, 20.0);
-                double y = map(center_N, maxN, minN, 0.0, 20.0);
+                double x = map(center_E, minE, minE + height, 0.0, max_size);
+                double y = map(center_N, maxN, minN, 0.0, max_size);
                 // find dimensions
-                double w = (((double) (max_contained_E - min_contained_E) / (double) height)) * cell_size * 20.0;
-                double h = (((double) (max_contained_N - min_contained_N) / (double) height)) * cell_size * 20.0;
+                double w = (((double) (max_contained_E - min_contained_E) / (double) height)) * cell_size * max_size;
+                double h = (((double) (max_contained_N - min_contained_N) / (double) height)) * cell_size * max_size;
                 
                 fprintf(sink, "\\node[inner sep=0pt] (russel) at (%lf, -%lf) {\\includegraphics[width=%lfcm, height=%lfcm]{%s}};\n", x, y, w, h, map_file);
                 // fprintf(sink, "\\filldraw[black] (%lf, -%lf) circle (2pt) node[anchor=south west]{%s};\n", x, y, map_file);
@@ -676,8 +681,8 @@ void print_map(FILE* sink) {
         for (size_t i = 0; i < path_len; i ++) {
             if (i % index_step == 0 || i == path_len - 1)
                 fprintf(sink, "(%f, %f) ",
-                    map(path[i].e, minE, height+minE, 0, 20.0),
-                    map(path[i].n, maxN, minN, 0, -20.0));
+                    map(path[i].e, minE, height+minE, 0, max_size),
+                    map(path[i].n, maxN, minN, 0, -max_size));
         }
         fprintf(sink, "};\n");
 
@@ -685,8 +690,8 @@ void print_map(FILE* sink) {
         for (size_t i = 0; i < waypoints_len; i++) {
             waypoint_name(i, wp_name);
             fprintf(sink, "\\filldraw[red] (%f,%f) circle (1pt) node[anchor=south west]{\\footnotesize %.*s};\n",
-                map(waypoints[i].e, minE, height+minE, 0, 20.0),
-                map(waypoints[i].n, maxN, minN, 0, -20.0),
+                map(waypoints[i].e, minE, height+minE, 0, max_size),
+                map(waypoints[i].n, maxN, minN, 0, -max_size),
                 2, wp_name);
         }
 
@@ -695,11 +700,7 @@ void print_map(FILE* sink) {
         // fprintf(sink, "\\filldraw[red] (%lf,%lf) circle (2pt) node[anchor=south west]{%s};\n", 0.0, -20.0, "C");
         // fprintf(sink, "\\filldraw[red] (%lf,%lf) circle (2pt) node[anchor=south west]{%s};\n", 20.0, -20.0, "D");
         fprintf(sink, "\\end{tikzpicture}\n");
-
-        if (height > width) {
-            fprintf(sink, "\\end{rotate}\n");
-        }
-        fprintf(sink, "\\end{center}\n");
+        fprintf(sink, "\\vfill\n\\end{center}\n");
     }
 }
 
@@ -712,7 +713,6 @@ void print_latex_document(FILE* sink, int include_map) {
     fprintf(sink, "\\usepackage[margin=%.0fcm]{geometry}\n", DOC_MARGIN);
     fprintf(sink, "\\usepackage{microtype}\n");
     fprintf(sink, "\\usepackage{longtable}\n");
-    fprintf(sink, "\\usepackage{rotating}\n");
     fprintf(sink, "\\usepackage{graphicx}\n");
     fprintf(sink, "\\usepackage{tikz}\n");
     fprintf(sink, "\\usepgflibrary{plotmarks}\n");
