@@ -71,7 +71,7 @@ void dsum_add(double asum[2048], double x) {
     size_t i;
     while (1) {
         /* i = exponent of f */
-        i = ((size_t)((*(unsigned int *)&x)>>52))&0x7ffL;
+        i = ((size_t)((*(uint64_t *)&x)>>52))&0x7ffL;
         if (i == 0x7ffL){          /* max exponent, could be overflow */
             asum[i] += x;
             return;
@@ -491,13 +491,12 @@ void print_map(FILE* sink) {
     fprintf(sink, "\n");
     fprintf(sink, "        \\vspace{2ex}\n");
     fprintf(sink, "\n");
-    fprintf(sink, "\\textsc{\\large Cartina}\n");
+    fprintf(sink, "\\textsc{\\large Carta topografica}\n");
     fprintf(sink, "    \\end{center}\n");
 
     fprintf(sink, "\n");
 
     {
-        uint64_t map_ids[] = {0, 0, 0, 0};
         uint64_t minE = 1000000000, maxE = 0, minN = 1000000000, maxN = 0;
         uint64_t E = 0, N = 0;
         for (size_t i = 0; i < path_len; i++) {
@@ -512,22 +511,45 @@ void print_map(FILE* sink) {
         uint64_t width = (maxE - minE) * 7 / 5;
         uint64_t height = (maxN - minN) * 7 / 5;
 
-        fprintf(sink, "\\begin{center}\n");
+        minE -= width / 7;
+        maxE += width / 7;
+        minN -= height / 7;
+        maxN += height / 7;
 
-        minE = minE - width / 7;
-        maxE = maxE + width / 7;
-        minN = minN - height / 7;
-        maxN = maxN + height / 7;
+        if (width > height) {
+            if((double) width / (double) height > 1.5) {
+                uint64_t new_height = width * 2 / 3;
+                minN -= (new_height - height)/2;
+                maxN += (new_height - height)/2;
+            }
+            if((double) width / (double) height < 1.5) {
+                uint64_t new_width = height * 3 / 2;
+                minE -= (new_width - width) /2;
+                maxE += (new_width - width)/2;
+            }
+        } else {
+            if((double) height / (double) width > 1.5) {
+                uint64_t new_width = height * 2 / 3;
+                minE -= (new_width - width) /2;
+                maxE += (new_width - width)/2;
+            }
+            if((double) height / (double) width < 1.5) {
+                uint64_t new_height = width * 3 / 2;
+                minN -= (new_height - height)/2;
+                maxN += (new_height - height)/2;
+            }
+        }
+
         // printf("MIN %ld %ld\n", minE, minN);
         // printf("MAX %ld %ld\n", maxE, maxN);
 
-        double scalex = (double) TILE_WIDTH / (double) width;
-        double scaley = (double) TILE_HEIGHT / (double) height;
+        // double scalex = (double) TILE_WIDTH / (double) width;
+        // double scaley = (double) TILE_HEIGHT / (double) height;
 
-        double scale = (scalex < scaley ? scalex : scaley);
-        if (scale < 1.0) {
-            scale = 1.0;
-        }
+        // double scale = (scalex < scaley ? scalex : scaley);
+        // if (scale < 1.0) {
+        //     scale = 1.0;
+        // }
 
         const double cell_size = 0.8;
         fprintf(sink, "\\begin{center}\n\\vfill\n\\begin{tikzpicture}[x=0.8cm,y=0.8cm, step=0.8cm");
@@ -590,7 +612,10 @@ void print_map(FILE* sink) {
                         " 2> /dev/null"
     #endif
                     , year, id, year, id, tiff_file);
+                    printf("[INFO] Donwloading map [id=%ld]... ", id);
+                    fflush(stdout);
                     system(get_url_cmd);
+                    printf("done!\n");
                 }
 
                 if (!file_exists(jpg_file)) {
@@ -603,7 +628,10 @@ void print_map(FILE* sink) {
                         " 2> /dev/null"
     #endif
                     , tiff_file, (int) strlen(tiff_file)-4, tiff_file);
+                    printf("[INFO] Cropping map [id=%ld]... ", id);
+                    fflush(stdout);
                     system(convert_cmd);
+                    printf("done!\n");
                 }
 
                 // cropping
@@ -665,6 +693,7 @@ void print_map(FILE* sink) {
                 // double ay = (((double) maxN - max_contained_N) / (double) height) * 20.0;
                 // double bx = ((max_contained_E - (double) minE) / (double) height) * 20.0;
                 // double by = (((double) maxN - min_contained_N) / (double) height) * 20.0;
+                // printf("1: %lf %lf %lf %lf", (double) minE, (double) minE+height, 0.0, max_size);
                 double x = map(center_E, minE, minE + height, 0.0, max_size);
                 double y = map(center_N, maxN, minN, 0.0, max_size);
                 // find dimensions
@@ -684,27 +713,37 @@ void print_map(FILE* sink) {
         }
 
         fprintf(sink, "\\draw[red] plot[smooth] coordinates{");
-
+        // printf("2: %lf %lf %lf %lf", (double) minE, (double) minE+height, 0.0, max_size);
         size_t index_step = 1;// path_len / 1000;
         for (size_t i = 0; i < path_len; i ++) {
             if (i % index_step == 0 || i == path_len - 1)
                 fprintf(sink, "(%f, %f) ",
-                    map(path[i].e, minE, height+minE, 0, max_size),
-                    map(path[i].n, maxN, minN, 0, -max_size));
+                    map(path[i].e, minE, minE+height, 0.0, max_size),
+                    -map(path[i].n, maxN, minN, 0.0, max_size));
         }
         fprintf(sink, "};\n");
 
         char wp_name[2] = {0};
         for (size_t i = 0; i < waypoints_len; i++) {
             waypoint_name(i, wp_name);
-            fprintf(sink, "\\filldraw[red] (%f,%f) circle (1pt) node[anchor=south west]{\\footnotesize %.*s};\n",
-                map(waypoints[i].e, minE, height+minE, 0, max_size),
-                map(waypoints[i].n, maxN, minN, 0, -max_size),
+            fprintf(sink, "\\filldraw[red] (%f,%f) circle (1pt) node[anchor=south west]{\\textbf{\\footnotesize %.*s}};\n",
+                map(waypoints[i].e, minE, minE+height, 0.0, max_size),
+                -map(waypoints[i].n, maxN, minN, 0.0, max_size),
                 2, wp_name);
         }
 
-        // fprintf(sink, "\\filldraw[red] (%lf,%lf) circle (2pt) node[anchor=south west]{%s};\n", 0.0, 0.0, "A");
-        // fprintf(sink, "\\filldraw[red] (%lf,%lf) circle (2pt) node[anchor=south west]{%s};\n", 20.0, 0.0, "B");
+        // NORTH ARROW
+        // fprintf(sink, "\\draw [-stealth, ultra thick, white]  (%lf,%lf) -- (%lf,%lf);\n",
+        //     map(maxE, minE, height+minE, 0, max_size) - 1.5,
+        //     map(maxN, maxN, minN, 0, -max_size) - 1.5,
+        //     map(maxE, minE, height+minE, 0, max_size) - 1.5,
+        //     map(maxN, maxN, minN, 0, -max_size) - 0.5);
+        // fprintf(sink, "\\draw [-stealth, thick, black]  (%lf,%lf) -- (%lf,%lf);\n",
+        //     map(maxE, minE, height+minE, 0, max_size) - 1.5,
+        //     map(maxN, maxN, minN, 0, -max_size) - 1.45,
+        //     map(maxE, minE, height+minE, 0, max_size) - 1.5,
+        //     map(maxN, maxN, minN, 0, -max_size) - 0.55);
+        // fprintf(sink, "\\filldraw[red] (%lf,%lf) circle (8pt) node[anchor=south west]{%s};\n", 0.0, 0.0, "B");
         // fprintf(sink, "\\filldraw[red] (%lf,%lf) circle (2pt) node[anchor=south west]{%s};\n", 0.0, -20.0, "C");
         // fprintf(sink, "\\filldraw[red] (%lf,%lf) circle (2pt) node[anchor=south west]{%s};\n", 20.0, -20.0, "D");
         fprintf(sink, "\\end{tikzpicture}\n");
@@ -717,6 +756,7 @@ void print_latex_document(FILE* sink, int include_map) {
     setlocale(LC_NUMERIC, "");
 
     fprintf(sink, "\\documentclass[a4paper,10pt,landscape]{article}\n");
+    // fprintf(sink, "\\usepackage[outline]{contour}\n");
     fprintf(sink, "\\usepackage{multirow}\n");
     fprintf(sink, "\\usepackage[margin=%.0fcm]{geometry}\n", DOC_MARGIN);
     fprintf(sink, "\\usepackage{microtype}\n");
