@@ -529,17 +529,25 @@ void print_map(FILE* sink) {
             scale = 1.0;
         }
 
-        double cell_size = 0.8;
+        const double cell_size = 0.8;
         fprintf(sink, "\\begin{center}\n\\vfill\n\\begin{tikzpicture}[x=0.8cm,y=0.8cm, step=0.8cm");
         if (height > width) {
-            fprintf(sink, ",rotate=90, transform shape");
+            fprintf(sink, ",rotate=270, transform shape");
         }
         fprintf(sink, "] \n");
 
-        double max_size = 20.0;
-        // if (height > width) {
-        //     max_size = 30.0;
-        // }
+        double max_size = 0.0;
+        if (height < width) {
+            max_size = 20.0;
+            if (max_size / height * width > 30.0) {
+                max_size = 30.0 / width * height;
+            }
+        } else {
+            max_size = 30.0;
+            if (max_size / height * width > 20.0) {
+                max_size = 20.0 / width * height;
+            }
+        }
         // fprintf(sink, "\\draw[very thin,color=black!10] (0.0,0.0) grid (%.1lf,-%.1lf);\n", 30.0+0.5, 20.0+0.5);
 
         size_t t = time(NULL);
@@ -924,7 +932,7 @@ void print_latex_document(FILE* sink, int include_map) {
         triangle_y = map(min_ele, 0, 3000.0, 0, PLOT_MAX_Y) + 0.25;
         triangle_y = triangle_y > PLOT_MAX_Y ? PLOT_MAX_Y : triangle_y;
         fprintf(sink, "\\draw[black!50] (%f,%f) node[draw,isosceles triangle,isosceles triangle apex angle=60,draw,rotate=270, anchor=apex, scale=0.33, fill=black!50] {};\n", map(min_ele_x, 0, km, 0, PLOT_MAX_X), triangle_y);
-#if 1
+#if 0
         double ele_progress = map(max_ele_x, 0, km, 0, 1.0);
         if (ele_progress < 0.025) {
             fprintf(sink, "\\node[anchor=north west] at (%f,%f) {\\footnotesize %ld m};\n", map(max_ele_x, 0, km, 0, PLOT_MAX_X), map(max_ele, 0, 4000.0, 0, PLOT_MAX_Y) - 0.33, (uint64_t) (round(max_ele)));
