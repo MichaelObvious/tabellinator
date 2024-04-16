@@ -1,8 +1,9 @@
 #include <assert.h>
+#include <float.h>
+#include <locale.h>
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <locale.h>
 #include <time.h>
 
 #include "xml.c"
@@ -452,7 +453,7 @@ void print_map(FILE* sink) {
     fprintf(sink, "\n");
 
     double cell_size = 0.8;
-    fprintf(sink, "\\begin{center}\\begin{tikzpicture}[x=0.8cm,y=0.8cm, step=0.8cm] \n");
+    fprintf(sink, "\\begin{center}\\begin{tikzpicture}[x=0.8cm,y=0.8cm, step=0.8cm, highpoint/.style={fill=black, regular polygon, regular polygon sides=3, inner sep=1pt}] \n");
     // fprintf(sink, "\\draw[very thin,color=black!10] (0.0,0.0) grid (%.1lf,-%.1lf);\n", 30.0+0.5, 20.0+0.5);
 
     {
@@ -660,6 +661,7 @@ void print_latex_document(FILE* sink) {
     fprintf(sink, "\\usepackage{graphicx}\n");
     fprintf(sink, "\\usepackage{tikz}\n");
     fprintf(sink, "\\usepgflibrary{plotmarks}\n");
+    fprintf(sink, "\\usepgflibrary{shapes.geometric}\n");
     fprintf(sink, "\\usetikzlibrary{positioning}\n");
 
     fprintf(sink, "\n");
@@ -822,10 +824,20 @@ void print_latex_document(FILE* sink) {
         // fprintf(sink, "};\n");
 
         fprintf(sink, "\\draw plot[smooth] coordinates{");
+        double max_ele = -DBL_MAX, min_ele = DBL_MAX;
+        double max_ele_x = 0.0, min_ele_x = 0.0;
         {
             double path_x = 0;
             for (size_t i = 0; i < path_len; i ++) {
                 if (i > 0) path_x += distance(&path[i-1], &path[i]);
+                if (path[i].ele < min_ele) {
+                        min_ele = path[i].ele;
+                        min_ele_x = path_x;
+                }
+                if (path[i].ele > max_ele) {
+                        max_ele = path[i].ele;
+                        max_ele_x = path_x;
+                }
 
                 if (i % index_step == 0 || i == path_len - 1)
                     fprintf(sink, "(%f, %f) ",
@@ -834,6 +846,9 @@ void print_latex_document(FILE* sink) {
             }
         }
         fprintf(sink, "};\n");
+
+        // fprintf(sink, "\\filldraw[black] (%f,%f) node[draw,isosceles triangle,isosceles triangle apex angle=60,draw,rotate=90, anchor=apex] {%ld m};\n", map(max_ele_x, 0, km, 0, PLOT_MAX_X), map(max_ele - 40.0, 0, 4000.0, 0, PLOT_MAX_Y), (uint64_t)round(max_ele));
+        // fprintf(sink, "\\filldraw[black] (%f,%f) node[draw,isosceles triangle,isosceles triangle apex angle=60,draw,rotate=270, anchor=apex] {%ld m};\n", map(min_ele_x, 0, km, 0, PLOT_MAX_X), map(min_ele + 40.0, 0, 4000.0, 0, PLOT_MAX_Y), (uint64_t)round(min_ele));
 
         double x = 0;
         for (size_t i = 0; i < waypoints_len; i++) {
