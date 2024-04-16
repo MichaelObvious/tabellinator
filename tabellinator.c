@@ -61,6 +61,38 @@ size_t path_len = 0;
 PathSegmentData segments[PATH_SEGMENTS_CAP] = {0};
 size_t segments_len = 0;
 
+void dsum_clear(double asum[2048]) {
+    size_t i;
+    for(i = 0; i < 2048; i++)
+        asum[i] = 0.0;
+}
+
+void dsum_add(double asum[2048], double x) {
+    size_t i;
+    while (1) {
+        /* i = exponent of f */
+        i = ((size_t)((*(unsigned int *)&x)>>52))&0x7ffL;
+        if (i == 0x7ffL){          /* max exponent, could be overflow */
+            asum[i] += x;
+            return;
+        }
+        if(asum[i] == 0.0){     /* if empty slot store f */
+            asum[i] = x;
+            return;
+        }
+        x += asum[i];           /* else add slot to f, clear slot */
+        asum[i] = 0.0f;          /* and continue until empty slot */
+    }
+}
+
+double dsum_return(double asum[2048]) {
+    double sum = 0.f;
+    size_t i;
+    for(i = 0; i < 2048; i++)
+        sum += asum[i];
+    return sum;
+}
+
 inline static double map(const double n, const double nmin, const double nmax, const double min, const double max) {
     return ((n - nmin) * (max-min))/(nmax-nmin) + min;
 }
@@ -322,6 +354,13 @@ void calculate_path_segments_data() {
     assert(waypoints_len >= 2);
     size_t wp_idx = 1;
     segments_len = 1;
+    double dst_sum[2048] = {0};
+    double dh_sum[2048] = {0};
+    double kms_sum[2048] = {0};
+    dsum_clear(dst_sum);
+    dsum_clear(dh_sum);
+    dsum_clear(kms_sum);
+
     for (size_t i = 1; i < path_len; i++) {
         assert(wp_idx < waypoints_len);
         PathSegmentData* ps = &segments[wp_idx-1];
@@ -331,16 +370,21 @@ void calculate_path_segments_data() {
         double dh = pb->ele - pa->ele;
         double kms = calculate_kms(dst, dh);
 
-
-        ps->dst += dst;
-        ps->dh += dh;
-        ps->kms += kms;
+        dsum_add(dst_sum, dst);
+        dsum_add(dh_sum, dh);
+        dsum_add(kms_sum, kms);
 
         if (distance(&waypoints[wp_idx], &path[i]) <= 0.0001) { // TODO: calculate min ddistance
+            ps->dst = dsum_return(dst_sum);
+            ps->dh = dsum_return(dh_sum);
+            ps->kms = dsum_return(kms_sum);
+            dsum_clear(dst_sum);
+            dsum_clear(dh_sum);
+            dsum_clear(kms_sum);
             double time = 60.0 * (ps->kms / (FACTOR * ADJUSTMENT_FACTOR));
-
             ps->t = (uint64_t) round(time);
             (ps+1)->pause = pauses[wp_idx];
+
 
             {
                 // size_t min = ps->t % 60;
@@ -418,7 +462,7 @@ void parse_gpx(uint8_t* src, const char* file_path) {
 
 uint64_t lv95_to_tileid(const uint64_t E, const uint64_t N) {
     uint64_t y = (1302000 - N - 1)/TILE_HEIGHT;
-    uint64_t x = (E + 1 - 2479000)/TILE_WIDTH;
+    uint64_t x = (E + 1 - 2480000)/TILE_WIDTH;
     return 1000 + y * 20 + x;
 }
 
@@ -427,7 +471,7 @@ void tileid_coord(const uint64_t id, uint64_t* E, uint64_t* N) { // south west
     // uint64_t x = (E - 2480000)/TILE_WIDTH;
     uint64_t x = (id - 1000)%20;
     uint64_t y = (id - 1000)/20;
-    *E = (x * TILE_WIDTH) + 2479000;
+    *E = (x * TILE_WIDTH) + 2480000;
     *N = -((y * TILE_HEIGHT) - 1302000) - TILE_HEIGHT;
     // return 1000 + y * 20 + x;
 }
@@ -749,19 +793,34 @@ void print_latex_document(FILE* sink) {
     fprintf(sink, "        &&&&&& \\\\\n");
     fprintf(sink, "        \\hline\n");
 
-    double minx = 4000, maxx = 0, updh = 0, downdh = 0;
+    double minh = 3000, maxh = 0;
+    double updh_sum[2048] = {0};
+    double downdh_sum[2048] = {0};
+    dsum_clear(updh_sum);
+    dsum_clear(downdh_sum);
     for (size_t i = 0; i < path_len; i++) {
         Point p = path[i];
-        if (p.ele < minx) minx = p.ele;
-        if (p.ele > maxx) maxx = p.ele;
+        if (p.ele < minh) minh = p.ele;
+        if (p.ele > maxh) maxh = p.ele;
         if (i > 0) {
             Point p_ = path[i-1];
             double dh = p.ele - p_.ele;
-            if (dh > 0) updh += dh; else downdh += dh;
+            if (dh > 0.0) dsum_add(updh_sum, dh); else dsum_add(downdh_sum, -dh);
         }
     }
+    // printf("%lf\n", dsum_return(updh_sum)-dsum_return(downdh_sum) - maxh + minh);
+
+    // DIRTY HACK
+    double counting_error = dsum_return(updh_sum)-dsum_return(downdh_sum) - maxh + minh;
+    if (counting_error < 0.0) {
+        dsum_add(downdh_sum, counting_error);
+    } else {
+        dsum_add(updh_sum, -counting_error);
+    }
+    // printf("%lf\n", dsum_return(updh_sum)-dsum_return(downdh_sum) - maxh + minh);
+
     uint64_t tot_time = (uint64_t) round(60.0 * kms / (FACTOR * ADJUSTMENT_FACTOR));
-    fprintf(sink, "        \\multirow{2}{*}{%.0f m.s.l.m.} & \\multirow{2}{*}{%.0f m.s.l.m.} & \\multirow{2}{*}{%.0f m} & \\multirow{2}{*}{%.0f m} & \\multirow{2}{*}{%.2f km} & \\multirow{2}{*}{%.2f kms} & \\multirow{2}{*}{%ld h %ld min} \\\\\n", round(minx), round(maxx), round(updh), round(-downdh), km, kms, tot_time/60, tot_time%60);
+    fprintf(sink, "        \\multirow{2}{*}{%.0f m.s.l.m.} & \\multirow{2}{*}{%.0f m.s.l.m.} & \\multirow{2}{*}{%.0f m} & \\multirow{2}{*}{%.0f m} & \\multirow{2}{*}{%.2f km} & \\multirow{2}{*}{%.2f kms} & \\multirow{2}{*}{%ld h %ld min} \\\\\n", round(minh), round(maxh), round(dsum_return(updh_sum)), round(dsum_return(downdh_sum)), km, kms, tot_time/60, tot_time%60);
     fprintf(sink, "        &&&&&& \\\\\n");
     fprintf(sink, "        \\hline\n");
     fprintf(sink, "    \\end{tabular}\\end{center}\n");
@@ -854,7 +913,7 @@ void print_latex_document(FILE* sink) {
         triangle_y = map(min_ele, 0, 3000.0, 0, PLOT_MAX_Y) + 0.25;
         triangle_y = triangle_y > PLOT_MAX_Y ? PLOT_MAX_Y : triangle_y;
         fprintf(sink, "\\draw[black!50] (%f,%f) node[draw,isosceles triangle,isosceles triangle apex angle=60,draw,rotate=270, anchor=apex, scale=0.33, fill=black!50] {};\n", map(min_ele_x, 0, km, 0, PLOT_MAX_X), triangle_y);
-#if 0
+#if 1
         double ele_progress = map(max_ele_x, 0, km, 0, 1.0);
         if (ele_progress < 0.025) {
             fprintf(sink, "\\node[anchor=north west] at (%f,%f) {\\footnotesize %ld m};\n", map(max_ele_x, 0, km, 0, PLOT_MAX_X), map(max_ele, 0, 4000.0, 0, PLOT_MAX_Y) - 0.33, (uint64_t) (round(max_ele)));
@@ -883,7 +942,7 @@ void print_latex_document(FILE* sink) {
 
     fprintf(sink, "    \\end{tikzpicture}\\end{center}\n");
 
-#if 0
+#if 1
     print_map(sink);
 #endif
     
