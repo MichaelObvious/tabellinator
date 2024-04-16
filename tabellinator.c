@@ -780,10 +780,11 @@ void print_latex_document(FILE* sink) {
 
     fprintf(sink, "\n");
 
-    #define PLOT_MAX_X 30.0
-    #define PLOT_MAX_Y 20.0
+    #define PLOT_MAX_X 25.0
+    #define PLOT_MAX_Y 15.0
 
-    fprintf(sink, "    \\begin{center}\\begin{tikzpicture}[x=0.8cm,y=0.8cm, step=0.8cm]\n");
+    #define CELL_SIZE 1.0
+    fprintf(sink, "    \\begin{center}\\begin{tikzpicture}[x=%lfcm,y=%lfcm, step=%lfcm]\n", CELL_SIZE, CELL_SIZE, CELL_SIZE);
 
         fprintf(sink, "\\draw[very thin,color=black!10] (0.0,0.0) grid (%.1f,%.1f);\n", PLOT_MAX_X+0.5, PLOT_MAX_Y+0.5);
 
@@ -793,7 +794,7 @@ void print_latex_document(FILE* sink) {
         fprintf(sink, "\\filldraw[black] (0,0) rectangle (0.0,0.0) node[anchor=north east]{0};\n");
 
         for (size_t h = 1; h < (size_t) PLOT_MAX_Y + 1; h++) {
-            fprintf(sink, "\\filldraw[black] (-0.05,%ld) rectangle (0.05, %ld) node[anchor=east]{%.0f};\n", h, h, ((double) h /PLOT_MAX_Y) * 4000.0);
+            fprintf(sink, "\\filldraw[black] (-0.05,%ld) rectangle (0.05, %ld) node[anchor=east]{%.0f};\n", h, h, ((double) h /PLOT_MAX_Y) * 3000.0);
         }
 
         for (size_t k = 1; k < (size_t) PLOT_MAX_X + 1; k++) {
@@ -842,18 +843,41 @@ void print_latex_document(FILE* sink) {
                 if (i % index_step == 0 || i == path_len - 1)
                     fprintf(sink, "(%f, %f) ",
                         map(path_x, 0, km, 0, PLOT_MAX_X),
-                        map(path[i].ele, 0, 4000.0, 0, PLOT_MAX_Y));
+                        map(path[i].ele, 0, 3000.0, 0, PLOT_MAX_Y));
             }
         }
         fprintf(sink, "};\n");
 
-        // fprintf(sink, "\\filldraw[black] (%f,%f) node[draw,isosceles triangle,isosceles triangle apex angle=60,draw,rotate=90, anchor=apex] {%ld m};\n", map(max_ele_x, 0, km, 0, PLOT_MAX_X), map(max_ele - 40.0, 0, 4000.0, 0, PLOT_MAX_Y), (uint64_t)round(max_ele));
-        // fprintf(sink, "\\filldraw[black] (%f,%f) node[draw,isosceles triangle,isosceles triangle apex angle=60,draw,rotate=270, anchor=apex] {%ld m};\n", map(min_ele_x, 0, km, 0, PLOT_MAX_X), map(min_ele + 40.0, 0, 4000.0, 0, PLOT_MAX_Y), (uint64_t)round(min_ele));
+        double triangle_y = map(max_ele, 0, 3000.0, 0, PLOT_MAX_Y) - 0.25;
+        triangle_y = triangle_y < 0.0 ? 0.0 : triangle_y;
+        fprintf(sink, "\\draw[black!50] (%f,%f) node[draw,isosceles triangle,isosceles triangle apex angle=60,draw,rotate=90, anchor=apex, scale=0.33, fill=black!50] {};\n", map(max_ele_x, 0, km, 0, PLOT_MAX_X), triangle_y);
+        triangle_y = map(min_ele, 0, 3000.0, 0, PLOT_MAX_Y) + 0.25;
+        triangle_y = triangle_y > PLOT_MAX_Y ? PLOT_MAX_Y : triangle_y;
+        fprintf(sink, "\\draw[black!50] (%f,%f) node[draw,isosceles triangle,isosceles triangle apex angle=60,draw,rotate=270, anchor=apex, scale=0.33, fill=black!50] {};\n", map(min_ele_x, 0, km, 0, PLOT_MAX_X), triangle_y);
+#if 0
+        double ele_progress = map(max_ele_x, 0, km, 0, 1.0);
+        if (ele_progress < 0.025) {
+            fprintf(sink, "\\node[anchor=north west] at (%f,%f) {\\footnotesize %ld m};\n", map(max_ele_x, 0, km, 0, PLOT_MAX_X), map(max_ele, 0, 4000.0, 0, PLOT_MAX_Y) - 0.33, (uint64_t) (round(max_ele)));
+        // } else if (ele_progress > 0.9) {
+        //     fprintf(sink, "\\node[anchor=north east] at (%f,%f) {\\footnotesize %ld m};\n", map(max_ele_x, 0, km, 0, PLOT_MAX_X), map(max_ele, 0, 4000.0, 0, PLOT_MAX_Y) - 0.33, (uint64_t) (round(max_ele)));
+        } else {
+            fprintf(sink, "\\node[anchor=north] at (%f,%f) {\\footnotesize %ld m};\n", map(max_ele_x, 0, km, 0, PLOT_MAX_X), map(max_ele, 0, 4000.0, 0, PLOT_MAX_Y) - 0.33, (uint64_t) (round(max_ele)));
+        }
+
+        ele_progress = map(min_ele_x, 0, km, 0, 1.0);
+        if (ele_progress < 0.025) {
+            fprintf(sink, "\\node[anchor=south west] at (%f,%f) {\\footnotesize %ld m};\n", map(min_ele_x, 0, km, 0, PLOT_MAX_X), map(min_ele, 0, 4000.0, 0, PLOT_MAX_Y) + 0.33, (uint64_t) (round(min_ele)));
+        // } else if (ele_progress > 0.9) {
+        //     fprintf(sink, "\\node[anchor=south east] at (%f,%f) {\\footnotesize %ld m};\n", map(min_ele_x, 0, km, 0, PLOT_MAX_X), map(min_ele, 0, 4000.0, 0, PLOT_MAX_Y) + 0.33, (uint64_t) (round(min_ele)));
+        } else {
+            fprintf(sink, "\\node[anchor=south] at (%f,%f) {\\footnotesize %ld m};\n", map(min_ele_x, 0, km, 0, PLOT_MAX_X), map(min_ele, 0, 4000.0, 0, PLOT_MAX_Y) + 0.33, (uint64_t) (round(min_ele)));
+        }
+#endif
 
         double x = 0;
         for (size_t i = 0; i < waypoints_len; i++) {
             waypoint_name(i, wp_name);
-            fprintf(sink, "\\filldraw[black] (%f,%f) circle (2pt) node[anchor=south west]{%.*s};\n", map(x, 0, km, 0, PLOT_MAX_X), map(waypoints[i].ele, 0, 4000.0, 0, PLOT_MAX_Y), 2, wp_name);
+            fprintf(sink, "\\filldraw[black] (%f,%f) circle (2pt) node[anchor=south west]{%.*s};\n", map(x, 0, km, 0, PLOT_MAX_X), map(waypoints[i].ele, 0, 3000.0, 0, PLOT_MAX_Y), 2, wp_name);
             x += segments[i].dst;
         }
 
