@@ -552,23 +552,17 @@ void print_map(FILE* sink) {
         // }
 
         const double cell_size = 0.8;
-        fprintf(sink, "\\begin{center}\n\\vfill\n\\begin{tikzpicture}[x=0.8cm,y=0.8cm, step=0.8cm");
+        fprintf(sink, "\\begin{center}\n\\vfill\n\\begin{tikzpicture}[x=%lfcm,y=%lfcm, step=%lfcm", cell_size, cell_size, cell_size);
         if (height > width) {
-            fprintf(sink, ",rotate=270, transform shape");
+            fprintf(sink, ", rotate=270, transform shape");
         }
         fprintf(sink, "] \n");
 
         double max_size = 0.0;
         if (height < width) {
             max_size = 20.0;
-            if (max_size / height * width > 30.0) {
-                max_size = 30.0 / width * height;
-            }
         } else {
             max_size = 30.0;
-            if (max_size / height * width > 20.0) {
-                max_size = 20.0 / width * height;
-            }
         }
         // fprintf(sink, "\\draw[very thin,color=black!10] (0.0,0.0) grid (%.1lf,-%.1lf);\n", 30.0+0.5, 20.0+0.5);
 
@@ -717,18 +711,18 @@ void print_map(FILE* sink) {
         size_t index_step = 1;// path_len / 1000;
         for (size_t i = 0; i < path_len; i ++) {
             if (i % index_step == 0 || i == path_len - 1)
-                fprintf(sink, "(%f, %f) ",
+                fprintf(sink, "(%lf, %lf) ",
                     map(path[i].e, minE, minE+height, 0.0, max_size),
-                    -map(path[i].n, maxN, minN, 0.0, max_size));
+                    map(path[i].n, maxN, minN, 0.0, -max_size));
         }
         fprintf(sink, "};\n");
 
         char wp_name[2] = {0};
         for (size_t i = 0; i < waypoints_len; i++) {
             waypoint_name(i, wp_name);
-            fprintf(sink, "\\filldraw[red] (%f,%f) circle (1pt) node[anchor=south west]{\\textbf{\\footnotesize %.*s}};\n",
+            fprintf(sink, "\\filldraw[red] (%lf,%lf) circle (1pt) node[anchor=south west]{\\textbf{\\footnotesize %.*s}};\n",
                 map(waypoints[i].e, minE, minE+height, 0.0, max_size),
-                -map(waypoints[i].n, maxN, minN, 0.0, max_size),
+                map(waypoints[i].n, maxN, minN, 0.0, -max_size),
                 2, wp_name);
         }
 
