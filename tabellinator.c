@@ -561,8 +561,14 @@ void print_map(FILE* sink) {
         double max_size = 0.0;
         if (height < width) {
             max_size = 20.0;
+            if (max_size / height * width > 30.0) {
+                max_size = 30.0 / width * height;
+            }
         } else {
             max_size = 30.0;
+            if (max_size / height * width > 20.0) {
+                max_size = 20.0 / width * height;
+            }
         }
         // fprintf(sink, "\\draw[very thin,color=black!10] (0.0,0.0) grid (%.1lf,-%.1lf);\n", 30.0+0.5, 20.0+0.5);
 
