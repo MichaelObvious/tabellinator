@@ -496,10 +496,6 @@ void print_map(FILE* sink) {
 
     fprintf(sink, "\n");
 
-    double cell_size = 0.8;
-    fprintf(sink, "\\begin{center}\\begin{tikzpicture}[x=0.8cm,y=0.8cm, step=0.8cm, highpoint/.style={fill=black, regular polygon, regular polygon sides=3, inner sep=1pt}] \n");
-    // fprintf(sink, "\\draw[very thin,color=black!10] (0.0,0.0) grid (%.1lf,-%.1lf);\n", 30.0+0.5, 20.0+0.5);
-
     {
         uint64_t map_ids[] = {0, 0, 0, 0};
         uint64_t minE = 1000000000, maxE = 0, minN = 1000000000, maxN = 0;
@@ -516,20 +512,29 @@ void print_map(FILE* sink) {
         uint64_t width = (maxE - minE) * 7 / 5;
         uint64_t height = (maxN - minN) * 7 / 5;
 
+        fprintf(sink, "\\begin{center}\n");
+        if (height > width) {
+            fprintf(sink, "\\begin{rotate}{90}\n");
+        }
+
         minE = minE - width / 7;
         maxE = maxE + width / 7;
         minN = minN - height / 7;
         maxN = maxN + height / 7;
-        printf("MIN %ld %ld\n", minE, minN);
-        printf("MAX %ld %ld\n", maxE, maxN);
+        // printf("MIN %ld %ld\n", minE, minN);
+        // printf("MAX %ld %ld\n", maxE, maxN);
 
         double scalex = (double) TILE_WIDTH / (double) width;
         double scaley = (double) TILE_HEIGHT / (double) height;
 
         double scale = (scalex < scaley ? scalex : scaley);
-        if(scale < 1.0) {
+        if (scale < 1.0) {
             scale = 1.0;
         }
+
+        double cell_size = 0.8;
+        fprintf(sink, "\\begin{center}\\begin{tikzpicture}[x=0.8cm,y=0.8cm, step=0.8cm, highpoint/.style={fill=black, regular polygon, regular polygon sides=3, inner sep=1pt}] \n");
+        // fprintf(sink, "\\draw[very thin,color=black!10] (0.0,0.0) grid (%.1lf,-%.1lf);\n", 30.0+0.5, 20.0+0.5);
 
         size_t t = time(NULL);
 
@@ -609,30 +614,30 @@ void print_map(FILE* sink) {
                 max_contained_E = mapMaxE < (int64_t) maxE ? (int64_t) mapMaxE : (int64_t) maxE;
                 min_contained_N = mapMinN > (int64_t) minN ? (int64_t) mapMinN : (int64_t) minN;
                 max_contained_N = mapMaxN < (int64_t) maxN ? (int64_t) mapMaxN : (int64_t) maxN;
-                printf("MIN MIN / MAX MAX: %ld %ld %ld %ld\n", mapMinE, mapMinN, mapMaxE, mapMaxN);
-                printf("MIN MIN / MAX MAX: %ld %ld %ld %ld\n", min_contained_E, min_contained_N, max_contained_E, max_contained_N);
+                // printf("MIN MIN / MAX MAX: %ld %ld %ld %ld\n", mapMinE, mapMinN, mapMaxE, mapMaxN);
+                // printf("MIN MIN / MAX MAX: %ld %ld %ld %ld\n", min_contained_E, min_contained_N, max_contained_E, max_contained_N);
 
                 // get the size of the cropped image in pixels
                 double cropped_map_width = (double) (max_contained_E - min_contained_E) / (double) TILE_WIDTH;
                 double cropped_map_height = (double) (max_contained_N - min_contained_N) /  (double) TILE_HEIGHT;
                 uint64_t cropped_image_width =  (uint64_t) ((double) full_image_size_x * cropped_map_width);
                 uint64_t cropped_image_height = (uint64_t) ((double) full_image_size_y * cropped_map_height);
-                printf("WIDTH / HEIGHT: %ld %ld\n", cropped_image_width, cropped_image_height);
+                // printf("WIDTH / HEIGHT: %ld %ld\n", cropped_image_width, cropped_image_height);
 
                 // get the offset from the center of the image
                 double coord_offset_x = (double) (min_contained_E - mapMinE) / (double) TILE_WIDTH;
                 double coord_offset_y = (double) (mapMaxN - max_contained_N) / (double) TILE_HEIGHT;
-                printf("COORD OFFSETS: %f %f\n", coord_offset_x * TILE_WIDTH, coord_offset_y * TILE_HEIGHT);
+                // printf("COORD OFFSETS: %f %f\n", coord_offset_x * TILE_WIDTH, coord_offset_y * TILE_HEIGHT);
                 
                 int64_t pixel_offset_x = (int64_t) (coord_offset_x * (double)full_image_size_x);
                 int64_t pixel_offset_y = (int64_t)  (coord_offset_y * (double)full_image_size_y);
-                printf("PX OFFSETS: %ld %ld\n", pixel_offset_x, pixel_offset_y);
-                printf("\n");
+                // printf("PX OFFSETS: %ld %ld\n", pixel_offset_x, pixel_offset_y);
+                // printf("\n");
 
                 //construct command
                 char call_cmd[256] = {0};
                 snprintf(call_cmd, 256, "magick %s -crop %ldx%ld%+ld%+ld %s", jpg_file, cropped_image_width, cropped_image_height, pixel_offset_x, pixel_offset_y, map_file);
-                printf("[CROP] %s\n", call_cmd);
+                // printf("[CROP] %s\n", call_cmd);
                 system(call_cmd);
                 // call command
 
@@ -689,11 +694,16 @@ void print_map(FILE* sink) {
         // fprintf(sink, "\\filldraw[red] (%lf,%lf) circle (2pt) node[anchor=south west]{%s};\n", 20.0, 0.0, "B");
         // fprintf(sink, "\\filldraw[red] (%lf,%lf) circle (2pt) node[anchor=south west]{%s};\n", 0.0, -20.0, "C");
         // fprintf(sink, "\\filldraw[red] (%lf,%lf) circle (2pt) node[anchor=south west]{%s};\n", 20.0, -20.0, "D");
-        fprintf(sink, "\\end{tikzpicture}\\end{center}\n");
+        fprintf(sink, "\\end{tikzpicture}\n");
+
+        if (height > width) {
+            fprintf(sink, "\\end{rotate}\n");
+        }
+        fprintf(sink, "\\end{center}\n");
     }
 }
 
-void print_latex_document(FILE* sink) {
+void print_latex_document(FILE* sink, int include_map) {
     #define DOC_MARGIN 1.0
     setlocale(LC_NUMERIC, "");
 
@@ -702,6 +712,7 @@ void print_latex_document(FILE* sink) {
     fprintf(sink, "\\usepackage[margin=%.0fcm]{geometry}\n", DOC_MARGIN);
     fprintf(sink, "\\usepackage{microtype}\n");
     fprintf(sink, "\\usepackage{longtable}\n");
+    fprintf(sink, "\\usepackage{rotating}\n");
     fprintf(sink, "\\usepackage{graphicx}\n");
     fprintf(sink, "\\usepackage{tikz}\n");
     fprintf(sink, "\\usepgflibrary{plotmarks}\n");
@@ -942,9 +953,8 @@ void print_latex_document(FILE* sink) {
 
     fprintf(sink, "    \\end{tikzpicture}\\end{center}\n");
 
-#if 1
-    print_map(sink);
-#endif
+    if (include_map)
+        print_map(sink);
     
     fprintf(sink, "\\end{document}\n");
 }
@@ -966,6 +976,8 @@ void print_usage(const char* program) {
     printf("\n");
     printf("Opzioni:    --pdf       Invoca automaticamente xelatex per generare il file PDF.\n");
     printf("                        XeLaTeX deve essere installato perché ciò funzioni.\n");
+    printf("            --map       Scarica le mappe ufficiali svizzere e le include nel.\n");
+    printf("                        documento LaTeX.\n");
     printf("            -h,--help   Stampa il messaggio di aiuto, poi termina.\n");
 }
 
@@ -973,6 +985,7 @@ int main(int argc, char* argv[]) {
     const char* program = *argv;
     char* file_path = NULL;
     int build_pdf = 0;
+    int include_map = 0;
 
     while (--argc > 0) {
         argv++;
@@ -981,6 +994,8 @@ int main(int argc, char* argv[]) {
             file_path = *argv;
         } else if (strcmp(*argv, "--pdf") == 0) {
             build_pdf = 1;
+        } else if (strcmp(*argv, "--map") == 0) {
+            include_map = 1;
         } else if (strcmp(*argv, "-h") == 0 || strcmp(*argv, "--help") == 0) {
             print_usage(program);
             return 0;
@@ -1030,7 +1045,7 @@ int main(int argc, char* argv[]) {
         out_file = stdout;
     }
     
-    print_latex_document(out_file);
+    print_latex_document(out_file, include_map);
 
     // Create PDF
     if (out_file != stdout) {
