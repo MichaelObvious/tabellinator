@@ -564,27 +564,30 @@ void print_map(FILE* sink) {
                 max_contained_E = mapMaxE < (int64_t) maxE ? (int64_t) mapMaxE : (int64_t) maxE;
                 min_contained_N = mapMinN > (int64_t) minN ? (int64_t) mapMinN : (int64_t) minN;
                 max_contained_N = mapMaxN < (int64_t) maxN ? (int64_t) mapMaxN : (int64_t) maxN;
-                // printf("%ld %ld %ld %ld\n", min_contained_E, min_contained_N, max_contained_E, max_contained_N);
+                printf("MIN MIN / MAX MAX: %ld %ld %ld %ld\n", mapMinE, mapMinN, mapMaxE, mapMaxN);
+                printf("MIN MIN / MAX MAX: %ld %ld %ld %ld\n", min_contained_E, min_contained_N, max_contained_E, max_contained_N);
 
                 // get the size of the cropped image in pixels
                 double cropped_map_width = (double) (max_contained_E - min_contained_E) / (double) TILE_WIDTH;
                 double cropped_map_height = (double) (max_contained_N - min_contained_N) /  (double) TILE_HEIGHT;
                 uint64_t cropped_image_width =  (uint64_t) ((double) full_image_size_x * cropped_map_width);
                 uint64_t cropped_image_height = (uint64_t) ((double) full_image_size_y * cropped_map_height);
+                printf("WIDTH / HEIGHT: %ld %ld\n", cropped_image_width, cropped_image_height);
 
                 // get the offset from the center of the image
                 double coord_offset_x = (double) (min_contained_E - mapMinE) / (double) TILE_WIDTH;
                 double coord_offset_y = (double) (mapMaxN - max_contained_N) / (double) TILE_HEIGHT;
-                // printf("COORD OFFSETS: %f %f\n", coord_offset_x, coord_offset_y);5000
+                printf("COORD OFFSETS: %f %f\n", coord_offset_x * TILE_WIDTH, coord_offset_y * TILE_HEIGHT);
                 
                 int64_t pixel_offset_x = (int64_t) (coord_offset_x * (double)full_image_size_x);
                 int64_t pixel_offset_y = (int64_t)  (coord_offset_y * (double)full_image_size_y);
-                // printf("PX OFFSETS: %ld %ld\n", pixel_offset_x, pixel_offset_y);
+                printf("PX OFFSETS: %ld %ld\n", pixel_offset_x, pixel_offset_y);
+                printf("\n");
 
                 //construct command
                 char call_cmd[256] = {0};
                 snprintf(call_cmd, 256, "magick %s -crop %ldx%ld%+ld%+ld %s", jpg_file, cropped_image_width, cropped_image_height, pixel_offset_x, pixel_offset_y, map_file);
-                // printf("[CROP] %s\n", call_cmd);
+                printf("[CROP] %s\n", call_cmd);
                 system(call_cmd);
                 // call command
 
