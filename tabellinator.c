@@ -538,8 +538,8 @@ void print_map(FILE* sink) {
         width = new_width;
         height = new_height;
 
-        width = width * 6 / 5;
-        height = height * 6 / 5;
+        width = width * 12 / 10;
+        height = height * 12 / 10;
 
         minE -= width / 12;
         maxE += width / 12;
