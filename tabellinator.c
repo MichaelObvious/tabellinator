@@ -1028,10 +1028,11 @@ void compile_latex() {
 void print_usage(const char* program) {
     printf("UTILIZZO: %s <path/to/file.gpx> [--pdf]\n", program);
     printf("\n");
-    printf("Opzioni:    --pdf       Invoca automaticamente xelatex per generare il file PDF.\n");
+    printf("Opzioni:    --pdf       Invoca automaticamente XeLaTeX per generare il file PDF.\n");
     printf("                        XeLaTeX deve essere installato perché ciò funzioni.\n");
-    printf("            --map       Scarica le mappe ufficiali svizzere e le include nel.\n");
-    printf("                        documento LaTeX.\n");
+    printf("            --map       Scarica le mappe ufficiali svizzere e le include nel\n");
+    printf("                        documento LaTeX. CURL e ImageMagick devono essere\n");
+    printf("                        installati.\n");
     printf("            -h,--help   Stampa il messaggio di aiuto, poi termina.\n");
 }
 
