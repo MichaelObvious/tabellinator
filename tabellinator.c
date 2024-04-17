@@ -576,6 +576,9 @@ void print_map(FILE* sink) {
                 max_size = 20.0 / width * height;
             }
         }
+
+        double scale = (double) height / (max_size * cell_size * 0.01);
+        // printf("Map scale: 1:%ld\n", (uint64_t) round(scale));
         // fprintf(sink, "\\draw[very thin,color=black!10] (0.0,0.0) grid (%.1lf,-%.1lf);\n", 30.0+0.5, 20.0+0.5);
 
         const uint64_t dimension = width > height ? width : height;
@@ -1075,7 +1078,10 @@ void compile_latex() {
     " > /dev/null"
 #endif
     , out_file_path);
+    printf("[INFO]: Compiling LaTeX document... ");
+    fflush(stdout);
     system(command);
+    printf("done!");
 }
 
 void print_usage(const char* program) {
