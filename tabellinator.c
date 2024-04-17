@@ -783,6 +783,7 @@ void print_map(FILE* sink) {
         char wp_name[2] = {0};
         for (size_t i = 0; i < waypoints_len; i++) {
             waypoint_name(i, wp_name);
+            // TODO: anchor based on path
             fprintf(sink, "\\filldraw[red] (%lf,%lf) circle (1pt) node[anchor=south west]{\\textbf{\\footnotesize %.*s}};\n",
                 map(waypoints[i].e, minE, minE+height, 0.0, max_size),
                 map(waypoints[i].n, maxN, minN, 0.0, -max_size),
