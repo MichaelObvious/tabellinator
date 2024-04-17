@@ -578,14 +578,12 @@ void print_map(FILE* sink) {
         }
 
         double scale = (double) height / (max_size * cell_size * 0.01);
-        // printf("Map scale: 1:%ld\n", (uint64_t) round(scale));
+        printf("Map scale: 1:%ld\n", (uint64_t) round(scale));
         // fprintf(sink, "\\draw[very thin,color=black!10] (0.0,0.0) grid (%.1lf,-%.1lf);\n", 30.0+0.5, 20.0+0.5);
 
         const uint64_t dimension = width > height ? width : height;
-        double resolution_kinda = round(log2((double)dimension * 2.0 / TILE_WIDTH));
-        if (resolution_kinda < 0.0) {
-            resolution_kinda = 0.0;
-        }
+        double resolution_kinda = round(log2((double)dimension * 2.0 / TILE_WIDTH + 1.0));
+        resolution_kinda = resolution_kinda < 0.0 ? 0.0 : resolution_kinda;
 
         uint64_t resolution_id = (uint64_t) resolution_kinda < 5 ? (uint64_t) resolution_kinda : 5;
 
@@ -1079,10 +1077,10 @@ void compile_latex() {
     " > /dev/null"
 #endif
     , out_file_path);
-    printf("[INFO]: Compiling LaTeX document... ");
+    printf("[INFO] Compiling LaTeX document... ");
     fflush(stdout);
     system(command);
-    printf("done!");
+    printf("done!\n");
 }
 
 void print_usage(const char* program) {
