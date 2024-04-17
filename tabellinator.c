@@ -508,37 +508,43 @@ void print_map(FILE* sink) {
             if (N > maxN) maxN = N;
         }
 
-        uint64_t width = (maxE - minE) * 7 / 5;
-        uint64_t height = (maxN - minN) * 7 / 5;
+        uint64_t width = (maxE - minE);
+        uint64_t height = (maxN - minN);
 
-        minE -= width / 7;
-        maxE += width / 7;
-        minN -= height / 7;
-        maxN += height / 7;
 
+        uint64_t new_height = height, new_width = width;
         if (width > height) {
             if((double) width / (double) height > 1.5) {
-                uint64_t new_height = width * 2 / 3;
+                new_height = width * 2 / 3;
                 minN -= (new_height - height)/2;
                 maxN += (new_height - height)/2;
-            }
-            if((double) width / (double) height < 1.5) {
-                uint64_t new_width = height * 3 / 2;
+            } else if ((double) width / (double) height < 1.5) {
+                new_width = height * 3 / 2;
                 minE -= (new_width - width) /2;
                 maxE += (new_width - width)/2;
             }
         } else {
             if((double) height / (double) width > 1.5) {
-                uint64_t new_width = height * 2 / 3;
-                minE -= (new_width - width) /2;
-                maxE += (new_width - width)/2;
-            }
-            if((double) height / (double) width < 1.5) {
-                uint64_t new_height = width * 3 / 2;
-                minN -= (new_height - height)/2;
-                maxN += (new_height - height)/2;
+                new_width = height * 2 / 3;
+                minE -= (new_width - width) / 2;
+                maxE += (new_width - width) / 2;
+            } else if ((double) height / (double) width < 1.5) {
+                new_height = width * 3 / 2;
+                minN -= (new_height - height) / 2;
+                maxN += (new_height - height) / 2;
             }
         }
+
+        width = new_width;
+        height = new_height;
+
+        width = width * 6 / 5;
+        height = height * 6 / 5;
+
+        minE -= width / 12;
+        maxE += width / 12;
+        minN -= height / 12;
+        maxN += height / 12;
 
         // printf("MIN %ld %ld\n", minE, minN);
         // printf("MAX %ld %ld\n", maxE, maxN);
