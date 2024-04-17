@@ -578,14 +578,61 @@ void print_map(FILE* sink) {
         }
         // fprintf(sink, "\\draw[very thin,color=black!10] (0.0,0.0) grid (%.1lf,-%.1lf);\n", 30.0+0.5, 20.0+0.5);
 
+        const uint64_t dimension = width > height ? width : height;
+        double resolution_kinda = round(log2((double)dimension * 2.0 / TILE_WIDTH));
+        if (resolution_kinda < 0.0) {
+            resolution_kinda = 0.0;
+        }
+
+        uint64_t resolution_id = (uint64_t) resolution_kinda < 5 ? (uint64_t) resolution_kinda : 5;
+
+        uint64_t full_image_size_x = 0, full_image_size_y = 0;
+
+        switch (resolution_id)
+        {
+        case 0:
+            full_image_size_x = 14000;
+            full_image_size_y = 9600;
+            break;
+        case 1:
+            full_image_size_x = 7000;
+            full_image_size_y = 4800;
+            break;
+        case 2:
+            full_image_size_x = 3500;
+            full_image_size_y = 2400;
+            break;
+        case 3:
+            full_image_size_x = 1750;
+            full_image_size_y = 1200;
+            break;
+        case 4:
+            full_image_size_x = 875;
+            full_image_size_y = 600;
+            break;
+        case 5:
+            full_image_size_x = 438;
+            full_image_size_y = 300;
+            break;
+        default:
+            assert(0 && "Unreacheable");
+            break;
+        }
+
+        printf("[INFO] Chosen resolution: %ld (%ldx%ldpx)\n", resolution_id, full_image_size_x, full_image_size_y);
+
         size_t t = time(NULL);
 
         size_t checked_ids_size = 0;
         uint64_t checked_ids[32] = {0};
         size_t frame_id = 0;
-        const size_t step_divisor = (TILE_WIDTH / width) * 10;
-        for (uint64_t e = minE; e <= maxE; e += (TILE_WIDTH / step_divisor)) {
-            for (uint64_t n = maxN; n >= minN; n -= (TILE_HEIGHT / step_divisor)) {
+
+        const uint64_t min_dimension = width < height ? width : height;
+        uint64_t step = min_dimension / 32;
+        step = step < 100 ? step : 100;
+
+        for (uint64_t e = minE; e <= maxE; e += step) {
+            for (uint64_t n = maxN; n >= minN; n -= step) {
                 uint64_t id = lv95_to_tileid(e, n);
                 uint64_t e2 = 0, n2 = 0;
                 tileid_coord(id, &e2, &n2);
@@ -604,7 +651,7 @@ void print_map(FILE* sink) {
                 char jpg_file[16] = {0};
                 char map_file[24] = {0};
                 snprintf(tiff_file, 15, "%ld.tif", id);
-                snprintf(jpg_file, 15, "%ld-0.jpg", id);
+                snprintf(jpg_file, 15, "%ld-%ld.jpg", id, resolution_id);
                 snprintf(map_file, 24, "map-%ld-%05ld.jpg", id, t%100000);
 
                 uint64_t year = get_year(id);
@@ -634,16 +681,11 @@ void print_map(FILE* sink) {
                         " 2> /dev/null"
     #endif
                     , tiff_file, (int) strlen(tiff_file)-4, tiff_file);
-                    printf("[INFO] Cropping map [id=%ld]... ", id);
+                    printf("[INFO] Converting map  [id=%ld]... ", id);
                     fflush(stdout);
                     system(convert_cmd);
                     printf("done!\n");
                 }
-
-                // cropping
-
-                const uint64_t full_image_size_x = 14000;
-                const uint64_t full_image_size_y = 9600;
 
                 // get the coordinates contained in the map
                 int64_t mapMinE = 0, mapMinN = 0;
@@ -672,6 +714,8 @@ void print_map(FILE* sink) {
                 uint64_t cropped_image_height = (uint64_t) ((double) full_image_size_y * cropped_map_height);
                 // printf("WIDTH / HEIGHT: %ld %ld\n", cropped_image_width, cropped_image_height);
 
+                if (cropped_image_width == 0 || cropped_image_height == 0) continue;
+
                 // get the offset from the center of the image
                 double coord_offset_x = (double) (min_contained_E - mapMinE) / (double) TILE_WIDTH;
                 double coord_offset_y = (double) (mapMaxN - max_contained_N) / (double) TILE_HEIGHT;
@@ -683,10 +727,13 @@ void print_map(FILE* sink) {
                 // printf("\n");
 
                 //construct command
-                char call_cmd[256] = {0};
-                snprintf(call_cmd, 256, "magick %s -crop %ldx%ld%+ld%+ld %s", jpg_file, cropped_image_width, cropped_image_height, pixel_offset_x, pixel_offset_y, map_file);
-                // printf("[CROP] %s\n", call_cmd);
-                system(call_cmd);
+                char crop_cmd[256] = {0};
+                snprintf(crop_cmd, 256, "magick %s -crop %ldx%ld%+ld%+ld %s", jpg_file, cropped_image_width, cropped_image_height, pixel_offset_x, pixel_offset_y, map_file);
+                // printf("[CROP] %s\n", crop_cmd);
+                printf("[INFO] Cropping map    [id=%ld]... ", id);
+                fflush(stdout);
+                system(crop_cmd);
+                printf("done!\n");
                 // call command
 
                 // assert images are only one
@@ -702,13 +749,14 @@ void print_map(FILE* sink) {
                 // printf("1: %lf %lf %lf %lf", (double) minE, (double) minE+height, 0.0, max_size);
                 double x = map(center_E, minE, minE + height, 0.0, max_size);
                 double y = map(center_N, maxN, minN, 0.0, max_size);
+
                 // find dimensions
                 double w = (((double) (max_contained_E - min_contained_E) / (double) height)) * cell_size * max_size;
                 double h = (((double) (max_contained_N - min_contained_N) / (double) height)) * cell_size * max_size;
                 
                 fprintf(sink, "\\node[inner sep=0pt] (russel) at (%lf, -%lf) {\\includegraphics[width=%lfcm, height=%lfcm]{%s}};\n", x, y, w, h, map_file);
                 // fprintf(sink, "\\filldraw[black] (%lf, -%lf) circle (2pt) node[anchor=south west]{%s};\n", x, y, map_file);
-                
+
                 frame_id += 1;
 
                 // draw path
@@ -737,6 +785,11 @@ void print_map(FILE* sink) {
                 map(waypoints[i].n, maxN, minN, 0.0, -max_size),
                 2, wp_name);
         }
+
+        fprintf(sink, "\\draw[black] (%lf, %lf) rectangle (%lf, %lf);\n",
+            map(minE, minE, minE+height, 0.0, max_size), map(minN, maxN, minN, 0.0, -max_size),
+            map(maxE, minE, minE+height, 0.0, max_size), map(maxN, maxN, minN, 0.0, -max_size)
+        );
 
         // NORTH ARROW
         // fprintf(sink, "\\draw [-stealth, ultra thick, white]  (%lf,%lf) -- (%lf,%lf);\n",
