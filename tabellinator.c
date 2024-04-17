@@ -1085,7 +1085,7 @@ void compile_latex() {
 }
 
 void print_usage(const char* program) {
-    printf("UTILIZZO: %s <path/to/file.gpx> [--pdf]\n", program);
+    printf("UTILIZZO: %s <path/to/file.gpx> [opzioni]\n", program);
     printf("\n");
     printf("Opzioni:    --pdf       Invoca automaticamente XeLaTeX per generare il file PDF.\n");
     printf("                        XeLaTeX deve essere installato perché ciò funzioni.\n");
