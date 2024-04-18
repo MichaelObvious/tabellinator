@@ -781,8 +781,8 @@ void print_map(FILE* sink) {
         char wp_name[2] = {0};
         for (size_t i = 0; i < waypoints_len; i++) {
             waypoint_name(i, wp_name);
-            // TODO: anchor based on path
-            fprintf(sink, "\\filldraw[red] (%lf,%lf) circle (1.75pt) node[anchor=south west]{\\textbf{\\footnotesize %.*s}};\n",
+            // TODO: anchor based on path (calculate the angle before and angle after, take average, opposite shall be the letter)
+            fprintf(sink, "\\filldraw[red!85!black] (%lf,%lf) circle (1.75pt) node[anchor=south west]{\\textbf{\\contour{white}{\\small %.*s}}};\n",
                 map(waypoints[i].e, minE, minE+height, 0.0, max_size),
                 map(waypoints[i].n, maxN, minN, 0.0, -max_size),
                 2, wp_name);
@@ -817,7 +817,7 @@ void print_latex_document(FILE* sink, int include_map) {
     setlocale(LC_NUMERIC, "");
 
     fprintf(sink, "\\documentclass[a4paper,10pt,landscape]{article}\n");
-    // fprintf(sink, "\\usepackage[outline]{contour}\n");
+    fprintf(sink, "\\usepackage[outline,copies]{contour}\n");
     fprintf(sink, "\\usepackage{multirow}\n");
     fprintf(sink, "\\usepackage[margin=%.0fcm]{geometry}\n", DOC_MARGIN);
     fprintf(sink, "\\usepackage{microtype}\n");
@@ -831,6 +831,8 @@ void print_latex_document(FILE* sink, int include_map) {
     fprintf(sink, "\n");
     fprintf(sink, "\\begin{document}\n");
     fprintf(sink, "    \\pagenumbering{gobble}\n");
+    fprintf(sink, "    \\contourlength{0.5pt}\n");
+    fprintf(sink, "    \\contournumber{16}\n");
     fprintf(sink, "    \\begin{center}\n");
     fprintf(sink, "        \\textsc{\\Huge %s}\n", name);
     fprintf(sink, "\n");
