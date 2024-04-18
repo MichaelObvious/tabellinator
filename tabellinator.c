@@ -767,7 +767,7 @@ void print_map(FILE* sink) {
             }
         }
 
-        fprintf(sink, "\\draw[red] plot[smooth] coordinates{");
+        fprintf(sink, "\\draw[red, line width=1.5pt, opacity=0.5] plot[smooth] coordinates{");
         // printf("2: %lf %lf %lf %lf", (double) minE, (double) minE+height, 0.0, max_size);
         size_t index_step = 1;// path_len / 1000;
         for (size_t i = 0; i < path_len; i ++) {
@@ -782,7 +782,7 @@ void print_map(FILE* sink) {
         for (size_t i = 0; i < waypoints_len; i++) {
             waypoint_name(i, wp_name);
             // TODO: anchor based on path
-            fprintf(sink, "\\filldraw[red] (%lf,%lf) circle (1pt) node[anchor=south west]{\\textbf{\\footnotesize %.*s}};\n",
+            fprintf(sink, "\\filldraw[red] (%lf,%lf) circle (1.75pt) node[anchor=south west]{\\textbf{\\footnotesize %.*s}};\n",
                 map(waypoints[i].e, minE, minE+height, 0.0, max_size),
                 map(waypoints[i].n, maxN, minN, 0.0, -max_size),
                 2, wp_name);
