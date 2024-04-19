@@ -824,7 +824,7 @@ void print_map(FILE* sink) {
             }
         }
 
-        fprintf(sink, "\\begin{scope}[transparency group, opacity=0.5]\n");
+        fprintf(sink, "\\begin{scope}[transparency group, opacity=0.66]\n");
 
         fprintf(sink, "\\draw[red, line width=1.5pt] plot[smooth] coordinates{");
         // printf("2: %lf %lf %lf %lf", (double) minE, (double) minE+height, 0.0, max_size);
@@ -845,7 +845,7 @@ void print_map(FILE* sink) {
 
         fprintf(sink, "\\end{scope}\n");
 
-        fprintf(sink, "\\begin{scope}[transparency group, opacity=0.75]\n");
+        // fprintf(sink, "\\begin{scope}[transparency group, opacity=1.0]\n");
 
         char wp_name[2] = {0};
         for (size_t i = 0; i < waypoints_len; i++) {
@@ -939,7 +939,7 @@ void print_map(FILE* sink) {
             
             // printf("DIRECTION %lf %lf, `%s`\n", direction_vec.x, direction_vec.y, direction_str);
 
-            fprintf(sink, "\\filldraw[red!90!black, fill opacity=0.0, draw opacity=0.0, text opacity=1.0] (%lf,%lf) circle (2.25pt) node[anchor=%s]{\\textbf{\\contour{white}{\\small %.*s}}};\n",
+            fprintf(sink, "\\filldraw[red!90!black, fill opacity=0.0, draw opacity=0.0, text opacity=1.0] (%lf,%lf) circle (2.25pt) node[anchor=%s, inner sep=2.5mm]{\\textbf{\\contour{white}{\\small %.*s}}};\n",
                 map(waypoints[i].e, minE, minE+height, 0.0, max_size),
                 map(waypoints[i].n, maxN, minN, 0.0, -max_size),
                 direction_str,
@@ -982,7 +982,7 @@ void print_map(FILE* sink) {
         // fprintf(sink, "\\filldraw[red] (%lf,%lf) circle (8pt) node[anchor=south west]{%s};\n", 0.0, 0.0, "B");
         // fprintf(sink, "\\filldraw[red] (%lf,%lf) circle (2pt) node[anchor=south west]{%s};\n", 0.0, -20.0, "C");
         // fprintf(sink, "\\filldraw[red] (%lf,%lf) circle (2pt) node[anchor=south west]{%s};\n", 20.0, -20.0, "D");
-         fprintf(sink, "\\end{scope}\n");
+        //  fprintf(sink, "\\end{scope}\n");
 
         fprintf(sink, "\\end{tikzpicture}\n");
         fprintf(sink, "\\vfill\n\\end{center}\n");
