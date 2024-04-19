@@ -824,7 +824,7 @@ void print_map(FILE* sink) {
             }
         }
 
-        fprintf(sink, "\\begin{scope}[transparency group, opacity=0.66]\n");
+        fprintf(sink, "\\begin{scope}[transparency group, opacity=0.50]\n");
 
         fprintf(sink, "\\draw[red, line width=1.5pt] plot[smooth] coordinates{");
         // printf("2: %lf %lf %lf %lf", (double) minE, (double) minE+height, 0.0, max_size);
@@ -854,7 +854,7 @@ void print_map(FILE* sink) {
             // TODO: anchor based on path (calculate the angle before and angle after, take average, opposite shall be the letter)
 
             const size_t step = 1;
-            const size_t max_samples = 20;
+            const size_t max_samples = 100;
             
             Vec2d direction_vec = {0};
             char* direction_str = NULL;
@@ -866,11 +866,12 @@ void print_map(FILE* sink) {
 
             uint64_t x = waypoints[i].e, y = waypoints[i].n;
             double sum_x = 0.0, sum_y = 0.0;
-            int64_t count = 0;
+            int64_t n = 0, count = 0;
             for (int64_t j = path_idx-1; j > path_idx - step * max_samples && j >= 0; j--) {
-                sum_x += path[j].e - x;
-                sum_y += path[j].n - y;
-                count++;
+                sum_x += (path[j].e - x) * (max_samples - n + 1);
+                sum_y += (path[j].n - y) * (max_samples - n + 1);
+                n ++;
+                count += max_samples - count + 1;
             }
             // printf("BACKWARD COUNT: %ld\n", count);
             count = count <= 0 ? 1 : count;
@@ -880,11 +881,12 @@ void print_map(FILE* sink) {
             backward_vec = vec2d_normalized(backward_vec);
             // printf("BACKWARD %lf %lf\n", backward_vec.x, backward_vec.y);
 
-            sum_x = 0.0; sum_y = 0.0; count = 0;
+            sum_x = 0.0; sum_y = 0.0; count = 0; n = 0;
             for (int64_t j = path_idx+1; j < path_idx + step * max_samples && j < path_len; j++) {
-                sum_x += path[j].e - x;
-                sum_y += path[j].n - y;
-                count++;
+                sum_x += (path[j].e - x) * (max_samples - n + 1);
+                sum_y += (path[j].n - y) * (max_samples - n + 1);
+                n ++;
+                count += max_samples - count + 1;
             }
             // printf("FORWARD COUNT: %ld\n", count);
             count = count <= 0 ? 1 : count;
@@ -1145,7 +1147,7 @@ void print_latex_document(FILE* sink, int include_map) {
     #define CELL_SIZE 1.0
     fprintf(sink, "    \\begin{center}\\begin{tikzpicture}[x=%lfcm,y=%lfcm, step=%lfcm]\n", CELL_SIZE, CELL_SIZE, CELL_SIZE);
 
-        fprintf(sink, "\\draw[very thin,color=black!10] (0.0,0.0) grid (%.1f,%.1f);\n", PLOT_MAX_X+0.5, PLOT_MAX_Y+0.5);
+        fprintf(sink, "\\draw[very thin,color=black!20] (0.0,0.0) grid (%.1f,%.1f);\n", PLOT_MAX_X+0.5, PLOT_MAX_Y+0.5);
 
         fprintf(sink, "\\draw[->] (0,-0.5) -- (0,%.1f) node[above] {$h \\hphantom{i} [m]$};\n", PLOT_MAX_Y+0.2);
         fprintf(sink, "\\draw[->] (-0.5,0) -- (%.1f,0) node[right] {$s \\hphantom{i} [km]$};\n", PLOT_MAX_X+0.2);
