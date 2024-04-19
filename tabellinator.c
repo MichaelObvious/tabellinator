@@ -19,6 +19,7 @@ typedef struct {
     double e; // lv95
     double n;
     double ele; // m
+    size_t idx;
 } Point;
 
 typedef struct {
@@ -28,6 +29,10 @@ typedef struct {
     uint64_t t; // minutes
     uint64_t pause; // minutes
 } PathSegmentData;
+
+typedef struct {
+    double x, y;
+} Vec2d;
 
 double FACTOR = 5.0; // kms/h
 double ADJUSTMENT_FACTOR = 1.2; // because of too much precision
@@ -60,6 +65,53 @@ size_t path_len = 0;
 #define PATH_SEGMENTS_CAP WAYPOINTS_CAPACITY
 PathSegmentData segments[PATH_SEGMENTS_CAP] = {0};
 size_t segments_len = 0;
+
+#define DIRECTIONS_COUNT 8
+Vec2d directions_vectors[DIRECTIONS_COUNT] = {
+    (Vec2d) { 1.0, 0.0 },
+    (Vec2d) {0.7071067811865476, 0.7071067811865475},
+    (Vec2d) {0.0, 1.0},
+    (Vec2d) {-0.7071067811865475, 0.7071067811865476},
+    (Vec2d) {-1.0, 0.0},
+    (Vec2d) {-0.7071067811865477, -0.7071067811865475},
+    (Vec2d) {0.0, -1.0},
+    (Vec2d) {0.7071067811865474, -0.7071067811865477},
+};
+char* directions_labels[DIRECTIONS_COUNT] = {
+    "west", "south west", "south", "south east", "east", "north east", "north", "north west"
+};
+
+Vec2d vec2d_invert(Vec2d a) {
+    return (Vec2d) {
+        -a.x,
+        -a.y
+    };
+}
+
+double vec2d_length(Vec2d a) {
+    return sqrt(a.x*a.x + a.y*a.y);
+}
+
+Vec2d vec2d_normalized(Vec2d a) {
+    double length = vec2d_length(a);
+    if (length < 0.001) return (Vec2d) { 0.0, 0.0 };
+
+    return (Vec2d) {
+        a.x / length,
+        a.y / length
+    };
+}
+
+Vec2d vec2d_add(Vec2d a, Vec2d b) {
+    return (Vec2d) {
+        a.x + b.x,
+        a.y + b.y
+    };
+}
+
+double vec2d_dot(Vec2d a, Vec2d b) {
+    return a.x * b.x + a.y * b.y;
+}
 
 void dsum_clear(double asum[2048]) {
     size_t i;
@@ -352,6 +404,7 @@ double calculate_kms(double dst, double dh) {
 
 void calculate_path_segments_data() {
     assert(waypoints_len >= 2);
+    waypoints[0].idx = 0;
     size_t wp_idx = 1;
     segments_len = 1;
     double dst_sum[2048] = {0};
@@ -385,6 +438,8 @@ void calculate_path_segments_data() {
             ps->t = (uint64_t) round(time);
             (ps+1)->pause = pauses[wp_idx];
 
+            waypoints[wp_idx].idx = i;
+
 
             {
                 // size_t min = ps->t % 60;
@@ -401,6 +456,8 @@ void calculate_path_segments_data() {
             segments_len++;
         }
     }
+
+    waypoints[waypoints_len-1].idx = path_len-1;
 }
 
 void parse_gpx(uint8_t* src, const char* file_path) {
@@ -767,7 +824,9 @@ void print_map(FILE* sink) {
             }
         }
 
-        fprintf(sink, "\\draw[red, line width=1.5pt, opacity=0.5] plot[smooth] coordinates{");
+        fprintf(sink, "\\begin{scope}[transparency group, opacity=0.5]\n");
+
+        fprintf(sink, "\\draw[red, line width=1.5pt] plot[smooth] coordinates{");
         // printf("2: %lf %lf %lf %lf", (double) minE, (double) minE+height, 0.0, max_size);
         size_t index_step = 1;// path_len / 1000;
         for (size_t i = 0; i < path_len; i ++) {
@@ -777,15 +836,131 @@ void print_map(FILE* sink) {
                     map(path[i].n, maxN, minN, 0.0, -max_size));
         }
         fprintf(sink, "};\n");
+        for (size_t i = 0; i < waypoints_len; i++) {
+            fprintf(sink, "\\filldraw[red] (%lf,%lf) circle (2.25pt);\n",
+                map(waypoints[i].e, minE, minE+height, 0.0, max_size),
+                map(waypoints[i].n, maxN, minN, 0.0, -max_size));
+
+        }
+
+        fprintf(sink, "\\end{scope}\n");
+
+        fprintf(sink, "\\begin{scope}[transparency group, opacity=0.75]\n");
 
         char wp_name[2] = {0};
         for (size_t i = 0; i < waypoints_len; i++) {
-            waypoint_name(i, wp_name);
+            size_t wp_name_len = waypoint_name(i, wp_name);
+            // printf("%.*s (%ld/%ld)\n", 2, wp_name, waypoints[i].idx, path_len);
             // TODO: anchor based on path (calculate the angle before and angle after, take average, opposite shall be the letter)
-            fprintf(sink, "\\filldraw[red!85!black] (%lf,%lf) circle (1.75pt) node[anchor=south west]{\\textbf{\\contour{white}{\\small %.*s}}};\n",
+
+            const size_t step = 1;
+            const size_t max_samples = 20;
+            
+            Vec2d direction_vec = {0};
+            char* direction_str = NULL;
+            Vec2d forward_vec = {0};
+            Vec2d backward_vec = {0};
+            
+            size_t path_idx = waypoints[i].idx;
+            // printf("WAYPOINT PATH IDX: %ld\n", waypoints[i].idx);
+
+            uint64_t x = waypoints[i].e, y = waypoints[i].n;
+            double sum_x = 0.0, sum_y = 0.0;
+            int64_t count = 0;
+            for (int64_t j = path_idx-1; j > path_idx - step * max_samples && j >= 0; j--) {
+                sum_x += path[j].e - x;
+                sum_y += path[j].n - y;
+                count++;
+            }
+            // printf("BACKWARD COUNT: %ld\n", count);
+            count = count <= 0 ? 1 : count;
+            backward_vec = (Vec2d) {
+                sum_x / (double) count, sum_y / (double) count
+            };
+            backward_vec = vec2d_normalized(backward_vec);
+            // printf("BACKWARD %lf %lf\n", backward_vec.x, backward_vec.y);
+
+            sum_x = 0.0; sum_y = 0.0; count = 0;
+            for (int64_t j = path_idx+1; j < path_idx + step * max_samples && j < path_len; j++) {
+                sum_x += path[j].e - x;
+                sum_y += path[j].n - y;
+                count++;
+            }
+            // printf("FORWARD COUNT: %ld\n", count);
+            count = count <= 0 ? 1 : count;
+            forward_vec = (Vec2d) {
+                sum_x / (double) count, sum_y / (double) count
+            };
+            forward_vec = vec2d_normalized(forward_vec);
+            // printf("FORWARD %lf %lf\n", forward_vec.x, forward_vec.y);
+
+            if (vec2d_length(forward_vec) < 0.001) {
+                forward_vec = backward_vec;
+                // printf("FORWARD IS SHORT\n");
+            }
+            if (vec2d_length(backward_vec) < 0.001) {
+                backward_vec = forward_vec;
+                // printf("BACKWARD IS SHORT\n");
+            }
+
+            if (vec2d_dot(forward_vec, backward_vec) < -1.0 + 0.001) {
+                // printf("Very opposite! %lf\n", vec2d_dot(forward_vec, backward_vec));
+                double center_x = (maxE - minE)/2.0;
+                double center_y = (maxN - minN)/2.0;
+                Vec2d ray_from_center = vec2d_normalized((Vec2d) {
+                    x - center_x,
+                    y - center_y,
+                });
+                direction_vec = (Vec2d) {
+                    -forward_vec.y,
+                    forward_vec.x,
+                };
+                if (vec2d_dot(direction_vec, ray_from_center) < 0.0) {
+                    direction_vec = vec2d_invert(direction_vec);
+                }
+            } else {
+                direction_vec = vec2d_invert(vec2d_add(forward_vec, backward_vec));
+            }
+
+            direction_vec = vec2d_normalized(direction_vec);
+            for (size_t k = 0; k < DIRECTIONS_COUNT; k++) {
+                // printf("DIFFERENCE OF DISTANCE: %lf\n", vec2d_dot(directions_vectors[k], direction_vec) - 0.923);
+                if (vec2d_dot(directions_vectors[k], direction_vec) > 0.923) {
+                    direction_str = directions_labels[k];
+                    // fprintf(sink, "\\draw[green] [->, ultra thick] (%lf, %lf) -- (%lf, %lf);\n",
+                    //     map(waypoints[i].e, minE, minE+height, 0.0, max_size),
+                    //     map(waypoints[i].n, maxN, minN, 0.0, -max_size),
+                    //     map(waypoints[i].e, minE, minE+height, 0.0, max_size) + directions_vectors[k].x,
+                    //     map(waypoints[i].n, maxN, minN, 0.0, -max_size) + directions_vectors[k].y);
+                    break;
+                }
+            }
+            assert(direction_str != NULL);
+            
+            // printf("DIRECTION %lf %lf, `%s`\n", direction_vec.x, direction_vec.y, direction_str);
+
+            fprintf(sink, "\\filldraw[red!90!black, fill opacity=0.0, draw opacity=0.0, text opacity=1.0] (%lf,%lf) circle (2.25pt) node[anchor=%s]{\\textbf{\\contour{white}{\\small %.*s}}};\n",
                 map(waypoints[i].e, minE, minE+height, 0.0, max_size),
                 map(waypoints[i].n, maxN, minN, 0.0, -max_size),
-                2, wp_name);
+                direction_str,
+                wp_name_len, wp_name);
+
+            // fprintf(sink, "\\draw[black] [->, ultra thick] (%lf, %lf) -- (%lf, %lf);\n",
+            //     map(waypoints[i].e, minE, minE+height, 0.0, max_size),
+            //     map(waypoints[i].n, maxN, minN, 0.0, -max_size),
+            //     map(waypoints[i].e, minE, minE+height, 0.0, max_size) + backward_vec.x,
+            //     map(waypoints[i].n, maxN, minN, 0.0, -max_size) + backward_vec.y);
+            // fprintf(sink, "\\draw[blue] [->, ultra thick] (%lf, %lf) -- (%lf, %lf);\n",
+            //     map(waypoints[i].e, minE, minE+height, 0.0, max_size),
+            //     map(waypoints[i].n, maxN, minN, 0.0, -max_size),
+            //     map(waypoints[i].e, minE, minE+height, 0.0, max_size) + forward_vec.x,
+            //     map(waypoints[i].n, maxN, minN, 0.0, -max_size) + forward_vec.y);
+            // fprintf(sink, "\\draw[orange] [->, ultra thick] (%lf, %lf) -- (%lf, %lf);\n",
+            //     map(waypoints[i].e, minE, minE+height, 0.0, max_size),
+            //     map(waypoints[i].n, maxN, minN, 0.0, -max_size),
+            //     map(waypoints[i].e, minE, minE+height, 0.0, max_size) + direction_vec.x,
+            //     map(waypoints[i].n, maxN, minN, 0.0, -max_size) + direction_vec.y);
+
         }
 
         fprintf(sink, "\\draw[black] (%lf, %lf) rectangle (%lf, %lf);\n",
@@ -807,9 +982,12 @@ void print_map(FILE* sink) {
         // fprintf(sink, "\\filldraw[red] (%lf,%lf) circle (8pt) node[anchor=south west]{%s};\n", 0.0, 0.0, "B");
         // fprintf(sink, "\\filldraw[red] (%lf,%lf) circle (2pt) node[anchor=south west]{%s};\n", 0.0, -20.0, "C");
         // fprintf(sink, "\\filldraw[red] (%lf,%lf) circle (2pt) node[anchor=south west]{%s};\n", 20.0, -20.0, "D");
+         fprintf(sink, "\\end{scope}\n");
+
         fprintf(sink, "\\end{tikzpicture}\n");
         fprintf(sink, "\\vfill\n\\end{center}\n");
     }
+
 }
 
 void print_latex_document(FILE* sink, int include_map) {
