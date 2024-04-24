@@ -552,7 +552,7 @@ void print_map(FILE* sink) {
     fprintf(sink, "    \\end{center}\n");
 
     fprintf(sink, "\n");
-    fprintf(sink, "\\vfill\n");
+    // fprintf(sink, "\\vfill\n");
     fprintf(sink, "\n");
 
     {
@@ -573,7 +573,7 @@ void print_map(FILE* sink) {
 
         uint64_t new_height = height, new_width = width;
         const double rel_width = 34.6;
-        const double rel_height = 21.25;
+        const double rel_height = 21.75;
         const double rel_ratio = rel_width / rel_height;
         if (width > height) {
             if((double) width / (double) height > rel_ratio) {
@@ -620,7 +620,7 @@ void print_map(FILE* sink) {
         // }
 
         const double cell_size = 0.8;
-        fprintf(sink, "\\begin{center}\n\\vfill\n\\begin{tikzpicture}[x=%lfcm,y=%lfcm, step=%lfcm", cell_size, cell_size, cell_size);
+        fprintf(sink, "\\begin{center}\n\\begin{tikzpicture}[x=%lfcm,y=%lfcm, step=%lfcm", cell_size, cell_size, cell_size);
         if (height > width) {
             fprintf(sink, ", rotate=270, transform shape");
         }
@@ -992,7 +992,7 @@ void print_map(FILE* sink) {
         //  fprintf(sink, "\\end{scope}\n");
 
         fprintf(sink, "\\end{tikzpicture}\n");
-        fprintf(sink, "\\vfill\n\\end{center}\n");
+        fprintf(sink, "\\end{center}\n");
     }
 
 }
