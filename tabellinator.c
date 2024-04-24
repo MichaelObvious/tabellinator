@@ -573,7 +573,7 @@ void print_map(FILE* sink) {
 
         uint64_t new_height = height, new_width = width;
         const double rel_width = 34.6;
-        const double rel_height = 21.8;
+        const double rel_height = 21.75;
         const double rel_ratio = rel_width / rel_height;
         if (width > height) {
             if((double) width / (double) height > rel_ratio) {
