@@ -552,6 +552,8 @@ void print_map(FILE* sink) {
     fprintf(sink, "    \\end{center}\n");
 
     fprintf(sink, "\n");
+    fprintf(sink, "\\vfill\n");
+    fprintf(sink, "\n");
 
     {
         uint64_t minE = 1000000000, maxE = 0, minN = 1000000000, maxN = 0;
@@ -570,23 +572,26 @@ void print_map(FILE* sink) {
 
 
         uint64_t new_height = height, new_width = width;
+        const double rel_width = 34.6;
+        const double rel_height = 21.25;
+        const double rel_ratio = rel_width / rel_height;
         if (width > height) {
-            if((double) width / (double) height > 1.5) {
-                new_height = width * 2 / 3;
+            if((double) width / (double) height > rel_ratio) {
+                new_height = width * rel_height / rel_width;
                 minN -= (new_height - height)/2;
                 maxN += (new_height - height)/2;
-            } else if ((double) width / (double) height < 1.5) {
-                new_width = height * 3 / 2;
+            } else if ((double) width / (double) height < rel_ratio) {
+                new_width = height * rel_width / rel_height;
                 minE -= (new_width - width) /2;
                 maxE += (new_width - width)/2;
             }
         } else {
-            if((double) height / (double) width > 1.5) {
-                new_width = height * 2 / 3;
+            if((double) height / (double) width > rel_ratio) {
+                new_width = height * rel_height / rel_width;
                 minE -= (new_width - width) / 2;
                 maxE += (new_width - width) / 2;
-            } else if ((double) height / (double) width < 1.5) {
-                new_height = width * 3 / 2;
+            } else if ((double) height / (double) width < rel_ratio) {
+                new_height = width * rel_width / rel_height;
                 minN -= (new_height - height) / 2;
                 maxN += (new_height - height) / 2;
             }
@@ -623,14 +628,14 @@ void print_map(FILE* sink) {
 
         double max_size = 0.0;
         if (height < width) {
-            max_size = 20.0;
-            if (max_size / height * width > 30.0) {
-                max_size = 30.0 / width * height;
+            max_size = (double) rel_height;
+            if (max_size / height * width > (double) rel_width) {
+                max_size = rel_width / width * height;
             }
         } else {
-            max_size = 30.0;
-            if (max_size / height * width > 20.0) {
-                max_size = 20.0 / width * height;
+            max_size = (double) rel_width;
+            if (max_size / height * width > (double) rel_height) {
+                max_size = (double) rel_width / width * height;
             }
         }
 
