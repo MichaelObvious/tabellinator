@@ -544,15 +544,15 @@ void print_map(FILE* sink) {
     fprintf(sink, "\n");
 
     fprintf(sink, "    \\begin{center}\n");
-    fprintf(sink, "        \\textsc{\\Huge %s}\n", name);
+    fprintf(sink, "        \\textsc{\\Large %s}\n", name);
     fprintf(sink, "\n");
-    fprintf(sink, "        \\vspace{2ex}\n");
+    fprintf(sink, "        \\vspace{0.5ex}\n");
     fprintf(sink, "\n");
-    fprintf(sink, "\\textsc{\\large Carta topografica}\n");
+    fprintf(sink, "\\textsc{\\small Carta topografica}\n");
     fprintf(sink, "    \\end{center}\n");
 
     fprintf(sink, "\n");
-    // fprintf(sink, "\\vfill\n");
+    fprintf(sink, "\\vspace{2ex}\n");
     fprintf(sink, "\n");
 
     {
@@ -573,7 +573,7 @@ void print_map(FILE* sink) {
 
         uint64_t new_height = height, new_width = width;
         const double rel_width = 34.6;
-        const double rel_height = 21.75;
+        const double rel_height = 21.8;
         const double rel_ratio = rel_width / rel_height;
         if (width > height) {
             if((double) width / (double) height > rel_ratio) {
