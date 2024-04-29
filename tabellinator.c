@@ -644,7 +644,7 @@ void print_map(FILE* sink) {
         // fprintf(sink, "\\draw[very thin,color=black!10] (0.0,0.0) grid (%.1lf,-%.1lf);\n", 30.0+0.5, 20.0+0.5);
 
         const uint64_t dimension = width > height ? width : height;
-        double resolution_kinda = round(log2((double)dimension * 2.0 / TILE_WIDTH + 1.0));
+        double resolution_kinda = round(log2((double)dimension / TILE_WIDTH + 1.0));
         resolution_kinda = resolution_kinda < 0.0 ? 0.0 : resolution_kinda;
 
         uint64_t resolution_id = (uint64_t) resolution_kinda < 5 ? (uint64_t) resolution_kinda : 5;
@@ -858,8 +858,8 @@ void print_map(FILE* sink) {
             // printf("%.*s (%ld/%ld)\n", 2, wp_name, waypoints[i].idx, path_len);
             // TODO: anchor based on path (calculate the angle before and angle after, take average, opposite shall be the letter)
 
-            const size_t step = 1;
-            const size_t max_samples = 100;
+            const int64_t step = 1;
+            const int64_t max_samples = 25;
             
             Vec2d direction_vec = {0};
             char* direction_str = NULL;
@@ -872,7 +872,8 @@ void print_map(FILE* sink) {
             uint64_t x = waypoints[i].e, y = waypoints[i].n;
             double sum_x = 0.0, sum_y = 0.0;
             int64_t n = 0, count = 0;
-            for (int64_t j = path_idx-1; j > path_idx - step * max_samples && j >= 0; j--) {
+            for (int64_t j = path_idx-1; j > (int64_t) path_idx - step * max_samples && j >= 0; j--) {
+                // printf("    (%ld) %lf %lf\n", j, sum_x, sum_y);
                 sum_x += (path[j].e - x) * (max_samples - n + 1);
                 sum_y += (path[j].n - y) * (max_samples - n + 1);
                 n ++;
