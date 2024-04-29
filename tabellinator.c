@@ -1118,13 +1118,13 @@ void print_latex_document(FILE* sink, int include_map) {
     }
     // printf("%lf\n", dsum_return(updh_sum)-dsum_return(downdh_sum) - maxh + minh);
 
-    // DIRTY HACK
-    double counting_error = dsum_return(updh_sum)-dsum_return(downdh_sum) - maxh + minh;
-    if (counting_error < 0.0) {
-        dsum_add(downdh_sum, counting_error);
-    } else {
-        dsum_add(updh_sum, -counting_error);
-    }
+    // // DIRTY HACK
+    // double counting_error = dsum_return(updh_sum)-dsum_return(downdh_sum) - maxh + minh;
+    // if (counting_error < 0.0) {
+    //     dsum_add(downdh_sum, counting_error);
+    // } else {
+    //     dsum_add(updh_sum, -counting_error);
+    // }
     // printf("%lf\n", dsum_return(updh_sum)-dsum_return(downdh_sum) - maxh + minh);
 
     uint64_t tot_time = (uint64_t) round(60.0 * kms / (FACTOR * ADJUSTMENT_FACTOR));
