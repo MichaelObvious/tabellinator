@@ -12,6 +12,10 @@
     #define M_PI 3.14159265358979323846
 #endif
 
+#define max(a,b) (((a)>(b))?(a):(b))
+
+#define GRAPH_POINTS_COUNT 2500
+
 #define TILE_WIDTH 17500
 #define TILE_HEIGHT 12000
 
@@ -833,7 +837,7 @@ void print_map(FILE* sink) {
 
         fprintf(sink, "\\draw[red, line width=1.5pt] plot[smooth] coordinates{");
         // printf("2: %lf %lf %lf %lf", (double) minE, (double) minE+height, 0.0, max_size);
-        size_t index_step = 1;// path_len / 1000;
+        size_t index_step = max(path_len / GRAPH_POINTS_COUNT, 1);
         for (size_t i = 0; i < path_len; i ++) {
             if (i % index_step == 0 || i == path_len - 1)
                 fprintf(sink, "(%lf, %lf) ",
@@ -1168,7 +1172,7 @@ void print_latex_document(FILE* sink, int include_map) {
             fprintf(sink, "\\filldraw[black] (%ld,-0.05) rectangle (%ld,0.05) node[anchor=north]{%.1f};\n", k, k, round(((double) k /PLOT_MAX_X) * km * 10.0)/10.0);
         }
 
-        size_t index_step = 1; //path_len / 1000;
+        size_t index_step = max(path_len / GRAPH_POINTS_COUNT, 1);
         // printf("PATH OPTIMIZATION: %ld %ld\n", path_len, index_step);
         // fprintf(sink, "\\draw plot[smooth] coordinates{(0,0) ");
         // {
